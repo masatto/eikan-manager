@@ -1,0 +1,175 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>栄冠ナイン育成管理</title>
+  <style>
+    /* タブ切り替え用。screen.activeのみ表示する。 */
+    .screen { display: none; }
+    .screen.active { display: block; }
+  </style>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header>
+    <h1>栄冠ナイン<span>育成管理</span></h1>
+    <div id="saveStatus">未保存</div>
+  </header>
+
+  <!-- タブナビゲーション。data-screen属性で対応する<section>のidを指定する -->
+  <nav>
+    <button data-screen="dashboard" class="active">分析</button>
+    <button data-screen="players">選手一覧</button>
+    <button data-screen="edit">選手登録</button>
+    <button data-screen="lineup">スタメン</button>
+    <button data-screen="tools">入出力</button>
+    <button data-screen="settings">設定</button>
+  </nav>
+
+  <main>
+
+    <!-- ===== 分析タブ: チーム全体の戦力分析・コンバート提案 ===== -->
+    <section id="dashboard" class="screen active">
+      <div class="row">
+        <h2>チーム分析</h2>
+        <div style="display:flex;gap:8px;align-items:center">
+          <select id="yearView">
+            <option value="0">現在</option>
+            <option value="1">来年</option>
+            <option value="2">再来年</option>
+          </select>
+          <button id="advanceYearBtn" class="danger">年度進行</button>
+        </div>
+      </div>
+      <div id="summaryCards" class="grid"></div>
+      <div id="radarChart" class="radar-wrap"></div>
+      <h3>ポジション状況</h3>
+      <div id="positionAnalysis"></div>
+      <h3>投手分析</h3>
+      <div id="pitcherAnalysis"></div>
+      <h3>要注意・コンバート候補</h3>
+      <div id="convertSuggestions"></div>
+    </section>
+
+    <!-- ===== 選手一覧タブ: 名前・学年・メインポジ・総合力・メイン適性・第2適性のみ表示 ===== -->
+    <section id="players" class="screen">
+      <div class="row">
+        <h2>選手一覧</h2>
+        <button id="newPlayerBtn">＋ 新規</button>
+      </div>
+      <div class="filters">
+        <select id="gradeFilter">
+          <option value="all">全学年</option>
+          <option value="3">3年</option>
+          <option value="2">2年</option>
+          <option value="1">1年</option>
+        </select>
+        <select id="sortSelect">
+          <option value="grade">学年順</option>
+          <option value="overall">総合力順</option>
+          <option value="main">メイン適性順</option>
+          <option value="pos_投手">投手適性順</option>
+          <option value="pos_捕手">捕手適性順</option>
+          <option value="pos_一塁">一塁適性順</option>
+          <option value="pos_二塁">二塁適性順</option>
+          <option value="pos_三塁">三塁適性順</option>
+          <option value="pos_遊撃">遊撃適性順</option>
+          <option value="pos_外野">外野適性順</option>
+        </select>
+      </div>
+      <div id="playerList"></div>
+    </section>
+
+    <!-- ===== 選手登録タブ: 横並びボタン方式での能力入力 ===== -->
+    <section id="edit" class="screen">
+      <h2 id="editTitle">選手登録</h2>
+      <form id="playerForm">
+        <input type="hidden" id="playerId">
+
+        <label>名前<input id="playerName" required placeholder="山田 太郎"></label>
+
+        <div class="field">
+          <span>学年</span>
+          <div id="gradeButtons" class="choice"></div>
+        </div>
+
+        <div class="field">
+          <span>メインポジション</span>
+          <div id="mainPosButtons" class="choice"></div>
+        </div>
+
+        <div class="field">
+          <span>サブポジション</span>
+          <!-- タップで 未選択→○→◎→未選択 と3段階で切り替わる(app.js: buildSub) -->
+          <div id="subPosButtons" class="choice multi"></div>
+        </div>
+
+        <h3>野手能力</h3>
+        <div id="battingFields"></div>
+
+        <h3>右上能力</h3>
+        <div id="specialFields"></div>
+
+        <!-- メインポジションが投手の時だけ表示する(app.js: togglePitcherSection) -->
+        <div id="pitcherSection">
+          <h3>投手能力</h3>
+          <div class="two">
+            <label>球速<input id="speed" type="number" min="100" max="170" value="130"></label>
+            <label>球種数<input id="pitchTypes" type="number" min="0" max="7" value="0"></label>
+            <label>総変化量<input id="totalBreak" type="number" min="0" max="25" value="0"></label>
+          </div>
+          <!-- コントロール・スタミナ・投手右上能力(対ピンチ等)をまとめて表示 -->
+          <div id="pitchRankFields"></div>
+        </div>
+
+        <label>メモ<textarea id="memo" rows="3"></textarea></label>
+
+        <div class="actions">
+          <button type="submit" id="saveBtn" class="primary">保存</button>
+          <button type="button" id="deleteBtn" class="danger">削除</button>
+          <button type="button" id="clearBtn">クリア</button>
+        </div>
+      </form>
+    </section>
+
+    <!-- ===== スタメンタブ: 最適スタメン配置の提案 ===== -->
+    <section id="lineup" class="screen">
+      <div class="row">
+        <h2>スタメン考案</h2>
+        <select id="lineupYearView">
+          <option value="0">現在</option>
+          <option value="1">来年</option>
+          <option value="2">再来年</option>
+        </select>
+      </div>
+      <p class="muted">投手を除く野手から最適な9人+DHを自動選出します。×判定のポジションを優先して埋め、出場機会のない選手を活用します。</p>
+      <div id="lineupResult"></div>
+    </section>
+
+    <!-- ===== 入出力タブ: JSONバックアップの出力・読込 ===== -->
+    <section id="tools" class="screen">
+      <h2>入出力</h2>
+      <div class="panel">
+        <button id="exportBtn">JSONバックアップ出力</button>
+        <input type="file" id="importFile" accept="application/json">
+        <button id="importBtn">JSON読込</button>
+      </div>
+      <textarea id="jsonBox" placeholder="ここにバックアップJSONが表示されます"></textarea>
+      <h3>設定ファイル</h3>
+      <p>評価ロジックは config.json で変更できます。</p>
+    </section>
+
+    <!-- ===== 設定タブ: ポジション別の能力値重みをUIから変更できる ===== -->
+    <section id="settings" class="screen">
+      <h2>評価設定</h2>
+      <p class="muted">各ポジションの適性計算に使う能力値の重みを変更できます。合計が100%になるように設定してください。変更はブラウザに保存されます。</p>
+      <div id="weightSettings"></div>
+    </section>
+
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,547 @@
+/* =========================================================
+ * 栄冠ナイン育成管理アプリ - style.css
+ * テーマ: 夜の球場をイメージしたダークモード
+ * ========================================================= */
+
+/* ---------- Google Fonts (Oswald: スコアボード的な縦長ゴシック) ---------- */
+@import url('https://fonts.googleapis.com/css2?family=Oswald:wght@400;600;700&display=swap');
+
+/* ---------- カラーパレット・基本リセット ---------- */
+
+:root {
+  --bg: #0f1923;
+  --surface: #1a2535;
+  --card: #1e2d40;
+  --card-hover: #243348;
+  --border: #2a3a50;
+  --text: #e8edf4;
+  --muted: #7a8fa6;
+  --primary: #3b82f6;
+  --primary-dark: #2563eb;
+  --danger: #ef4444;
+  --ok: #22c55e;
+  --warn: #f59e0b;
+  --bad: #ef4444;
+  --accent: #3b82f6;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  line-height: 1.5;
+}
+
+
+/* ---------- ヘッダー ---------- */
+
+header {
+  padding: 14px 20px;
+  background: #0a1118;
+  color: #fff;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+h1 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 20px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  margin: 0;
+  color: #fff;
+}
+
+h1 span {
+  color: var(--accent);
+}
+
+h2 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  margin: 0 0 14px;
+  color: var(--text);
+}
+
+h3 {
+  font-family: 'Oswald', sans-serif;
+  font-size: 14px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-top: 24px;
+  margin-bottom: 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--border);
+}
+
+#saveStatus {
+  font-size: 11px;
+  color: var(--muted);
+  letter-spacing: 0.03em;
+}
+
+
+/* ---------- ナビゲーション ---------- */
+
+nav {
+  display: flex;
+  gap: 4px;
+  padding: 8px 16px;
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  overflow-x: auto;
+}
+
+nav button {
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  border: none;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 6px;
+  padding: 8px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: color 0.15s, background 0.15s;
+}
+
+nav button:hover {
+  color: var(--text);
+  background: var(--card);
+}
+
+nav button.active {
+  background: var(--primary);
+  color: #fff;
+}
+
+
+/* ---------- ボタン ---------- */
+
+button, select, input, textarea {
+  font: inherit;
+}
+
+button {
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  border-radius: 8px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font-size: 13px;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+button:hover {
+  background: var(--card-hover);
+  border-color: var(--primary);
+}
+
+button.primary {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+button.primary:hover {
+  background: var(--primary-dark);
+}
+
+button.danger {
+  border-color: #7f1d1d;
+  color: var(--danger);
+  background: rgba(239,68,68,0.08);
+}
+
+button.danger:hover {
+  background: rgba(239,68,68,0.15);
+}
+
+.choice button.selected {
+  background: var(--primary);
+  color: #fff;
+  border-color: var(--primary);
+}
+
+.choice button.selected.high {
+  background: #0f766e;
+  border-color: #0f766e;
+}
+
+
+/* ---------- レイアウト ---------- */
+
+main {
+  max-width: 1100px;
+  margin: auto;
+  padding: 16px;
+}
+
+.screen { display: none; }
+.screen.active { display: block; }
+
+.row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 10px;
+}
+
+
+/* ---------- カード ---------- */
+
+.card, .panel, .player-card, .analysis-card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  margin: 8px 0;
+}
+
+.player-card {
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, transform 0.1s;
+}
+
+.player-card:hover {
+  background: var(--card-hover);
+  border-color: var(--primary);
+  transform: translateY(-1px);
+}
+
+.card .big {
+  font-family: 'Oswald', sans-serif;
+  font-size: 32px;
+  font-weight: 700;
+  color: #fff;
+  line-height: 1;
+}
+
+.card .muted {
+  margin-top: 4px;
+}
+
+.muted {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.badge {
+  display: inline-block;
+  border-radius: 6px;
+  padding: 3px 8px;
+  margin: 2px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+  font-family: 'Oswald', sans-serif;
+  letter-spacing: 0.04em;
+}
+
+/* ◎○△× */
+.eval {
+  font-family: 'Oswald', sans-serif;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.eval.good { color: var(--ok); }
+.eval.mid  { color: var(--warn); }
+.eval.bad  { color: var(--bad); }
+
+
+/* ---------- フォーム ---------- */
+
+label {
+  display: block;
+  margin: 12px 0;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+}
+
+input, select, textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 12px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  transition: border-color 0.15s;
+}
+
+input:focus, select:focus, textarea:focus {
+  outline: none;
+  border-color: var(--primary);
+}
+
+select option {
+  background: var(--surface);
+}
+
+.field {
+  margin: 14px 0;
+}
+
+.field > span {
+  display: block;
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--muted);
+  margin-bottom: 8px;
+  letter-spacing: 0.04em;
+}
+
+
+/* ---------- 能力選択ボタン ---------- */
+
+.choice {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.choice button {
+  min-width: 40px;
+  padding: 7px 10px;
+  font-size: 12px;
+}
+
+.ability-row {
+  display: grid;
+  grid-template-columns: 90px 1fr;
+  gap: 8px;
+  align-items: center;
+  margin: 6px 0;
+}
+
+.ability-row strong {
+  font-size: 13px;
+  color: var(--muted);
+}
+
+.two {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 10px;
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 18px 0;
+}
+
+.actions button {
+  min-width: 88px;
+  text-align: center;
+  font-weight: 700;
+}
+
+
+/* ---------- 選手一覧 ---------- */
+
+.filters {
+  display: flex;
+  gap: 8px;
+  margin: 10px 0;
+}
+
+.filters select {
+  width: auto;
+  font-size: 13px;
+  padding: 7px 10px;
+}
+
+.player-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+}
+
+.player-head strong {
+  font-family: 'Oswald', sans-serif;
+  font-size: 15px;
+  letter-spacing: 0.03em;
+  color: #fff;
+}
+
+.player-head span {
+  font-family: 'Oswald', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.scores {
+  margin-top: 8px;
+}
+
+
+/* ---------- 分析行 ---------- */
+
+.analysis-row {
+  display: grid;
+  grid-template-columns: 64px 46px 1fr;
+  gap: 10px;
+  align-items: center;
+  border-bottom: 1px solid var(--border);
+  padding: 10px 0;
+}
+
+.analysis-row:last-child {
+  border-bottom: 0;
+}
+
+.analysis-row strong {
+  font-family: 'Oswald', sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.04em;
+  color: var(--text);
+}
+
+.analysis-card strong {
+  font-family: 'Oswald', sans-serif;
+  font-size: 14px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+
+/* ---------- レーダーチャート ---------- */
+
+.radar-wrap {
+  display: flex;
+  justify-content: center;
+  margin: 8px 0 16px;
+}
+
+.radar-wrap svg text {
+  font-family: 'Oswald', sans-serif;
+}
+
+
+/* ---------- バー ---------- */
+
+.bar {
+  height: 6px;
+  background: var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.bar > span {
+  display: block;
+  height: 100%;
+  background: var(--primary);
+  border-radius: 999px;
+}
+
+
+/* ---------- 入出力 ---------- */
+
+#jsonBox {
+  height: 180px;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+}
+
+
+/* ---------- スマートフォン向け ---------- */
+
+@media (max-width: 640px) {
+  header { padding: 12px 14px; }
+  main { padding: 12px; }
+
+  .ability-row {
+    grid-template-columns: 1fr;
+  }
+  .choice button {
+    min-width: 36px;
+    padding: 7px 8px;
+    font-size: 11px;
+  }
+  .row {
+    align-items: flex-start;
+  }
+  .analysis-row {
+    grid-template-columns: 56px 40px 1fr;
+    font-size: 13px;
+  }
+  nav button {
+    padding: 7px 10px;
+    font-size: 12px;
+  }
+}
+
+
+/* ---------- スタメン考案 ---------- */
+
+.lineup-row {
+  display: grid;
+  grid-template-columns: 48px 1fr 32px 36px;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.lineup-row:last-child {
+  border-bottom: none;
+}
+
+.lineup-pos {
+  font-family: 'Oswald', sans-serif;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--muted);
+  letter-spacing: 0.04em;
+}
+
+.lineup-name {
+  font-size: 14px;
+  color: var(--text);
+  font-weight: 600;
+}
+
+.lineup-bonus {
+  font-size: 11px;
+  color: var(--warn);
+  margin-left: 4px;
+}
+
+.lineup-score {
+  font-family: 'Oswald', sans-serif;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--accent);
+  text-align: right;
+}
