@@ -71,7 +71,8 @@ function applyCustomWeights() {
 const REQUIRED_CONFIG_KEYS = [
   'rankValues', 'positionBonus', 'topCounts', 'positionThresholds',
   'positionWeights', 'overallWeights', 'pitcherWeights', 'pitcherThresholds',
-  'speedScale', 'pitchTypeScale', 'totalBreakScale'
+  'speedScale', 'pitchTypeScale', 'totalBreakScale',
+  'positionRoles', 'manualBaseWeights', 'autoBaseWeights'
 ];
 
 // config.jsonの構造不備を検知し、不足キーがあれば標準値で補完しつつ画面上に警告を出す。
@@ -126,7 +127,23 @@ function defaultConfig() {
     pitcherThresholds: { ace: 5.2, relief: 4.8 },
     speedScale: { min: 120, max: 165 },
     pitchTypeScale: { min: 0, max: 7 },
-    totalBreakScale: { min: 0, max: 20 }
+    totalBreakScale: { min: 0, max: 20 },
+    positionRoles: {
+      捕手: { defense: 0.70, batting: 0.30 },
+      一塁: { defense: 0.40, batting: 0.60 },
+      二塁: { defense: 0.65, batting: 0.35 },
+      三塁: { defense: 0.45, batting: 0.55 },
+      遊撃: { defense: 0.70, batting: 0.30 },
+      外野: { defense: 0.35, batting: 0.65 }
+    },
+    manualBaseWeights: {
+      野手: { ミート: 0.35, パワー: 0.30, 走力: 0.20, 弾道: 0.15 },
+      投手: { 球速: 0.30, コントロール: 0.35, 総変化量: 0.25, 球種数: 0.10 }
+    },
+    autoBaseWeights: {
+      野手: { チャンス: 0.35, 対左投手: 0.25, キャッチャー: 0.20, 送球: 0.10, 守備力: 0.10 },
+      投手: { 対ピンチ: 0.30, 対左打者: 0.20, 打たれ強さ: 0.25, クイック: 0.10, スタミナ: 0.15 }
+    }
   };
 }
 
@@ -504,6 +521,79 @@ function pitcherScore(p, type = 'overall') {
   return s;
 }
 
+// 選手の特殊能力リストからmanualWeight/autoWeightの合計ボーナスを算出する
+function specialAbilityBonus(p, type) {
+  if (!config.specialAbilities || !p.specialAbilities?.length) return 0;
+  return p.specialAbilities.reduce((sum, name) => {
+    const def = config.specialAbilities.find(a => a.name === name);
+    if (!def) return sum;
+    const w = type === 'manual' ? (def.manualWeight || 0) : (def.autoWeight || 0);
+    return sum + w;
+  }, 0);
+}
+
+// 野手の自操作適性(ミート・パワー・走力・弾道の加重平均 + 特殊能力ボーナス)
+function battingScore(p) {
+  const w = config.manualBaseWeights?.野手 || {};
+  let s = 0;
+  Object.entries(w).forEach(([k, v]) => {
+    if (k === '弾道') {
+      const val = p.abilities?.弾道 || 1;
+      s += (1 + (val - 1) / 3 * 7) * v;
+    } else {
+      s += rank(p.abilities?.[k] || 'G') * v;
+    }
+  });
+  s += specialAbilityBonus(p, 'manual');
+  return s;
+}
+
+// 投手の自操作適性(球速・コントロール・総変化量・球種数の加重平均 + 特殊能力ボーナス)
+function pitcherManualScore(p) {
+  const w = config.manualBaseWeights?.投手 || {};
+  let s = 0;
+  Object.entries(w).forEach(([k, v]) => {
+    if (k === '球速') s += normSpeed(p.pitch?.球速 || 120) * v;
+    else if (k === '総変化量') s += norm(p.pitch?.総変化量 || 0, config.totalBreakScale) * v;
+    else if (k === '球種数') s += norm(p.pitch?.球種数 || 0, config.pitchTypeScale) * v;
+    else s += rank(p.pitch?.[k] || 'G') * v;
+  });
+  s += specialAbilityBonus(p, 'manual');
+  return s;
+}
+
+// 野手のオート適性(チャンス・対左投手・キャッチャー・送球・守備力の加重平均 + 特殊能力ボーナス)
+// キャッチャーは捕手のみ加算(非捕手がキャッチャーランクを持っていても評価しない)
+function fielderAutoScore(p) {
+  const w = config.autoBaseWeights?.野手 || {};
+  let s = 0;
+  Object.entries(w).forEach(([k, v]) => {
+    if (k === 'キャッチャー' && p.main !== '捕手') return;
+    s += rank(p.abilities?.[k] || 'G') * v;
+  });
+  s += specialAbilityBonus(p, 'auto');
+  return s;
+}
+
+// 投手のオート適性(対ピンチ・対左打者・打たれ強さ・クイック・スタミナの加重平均 + 特殊能力ボーナス)
+function pitcherAutoScore(p) {
+  const w = config.autoBaseWeights?.投手 || {};
+  let s = 0;
+  Object.entries(w).forEach(([k, v]) => {
+    s += rank(p.pitch?.[k] || 'G') * v;
+  });
+  s += specialAbilityBonus(p, 'auto');
+  return s;
+}
+
+// ポジション別の守備・打撃合算スコア(表示用・参考値)
+// 投手は既存のpitcherScore(overall)をそのまま返す
+function totalFieldScore(p, pos) {
+  if (pos === '投手') return pitcherScore(p, 'overall');
+  const roles = config.positionRoles?.[pos] || { defense: 0.55, batting: 0.45 };
+  return posFit(p, pos) * roles.defense + battingScore(p) * roles.batting;
+}
+
 // 1〜8スケールのスコアを0〜100点満点の表示用スコアに変換
 function score100(v) { return Math.round(v / 8 * 100); }
 
@@ -824,6 +914,8 @@ function renderPlayers() {
     const card = document.createElement('div');
     card.className = 'player-card';
     const second = secondFit(p);
+    const manualSc = p.main === '投手' ? pitcherManualScore(p) : battingScore(p);
+    const autoSc   = p.main === '投手' ? pitcherAutoScore(p)   : fielderAutoScore(p);
     card.innerHTML = `
       <div class="player-head">
         <strong>${p.grade}年 ${POS_SHORT[p.main]} ${p.name}</strong>
@@ -832,6 +924,8 @@ function renderPlayers() {
       <div class="scores">
         <span class="badge">${POS_SHORT[p.main]}${score100(posFit(p, p.main))}</span>
         <span class="badge">→${POS_SHORT[second.pos]}${score100(second.fit)}</span>
+        <span class="badge">自操${score100(manualSc)}</span>
+        <span class="badge">オート${score100(autoSc)}</span>
       </div>
       ${(p.specialAbilities || []).length ? `
         <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
