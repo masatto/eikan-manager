@@ -490,11 +490,10 @@ function posBonus(p, pos) {
   return config.positionBonus.none;
 }
 
-// ポジション適性(補正後)。チーム分析・コンバート候補の判定で使う「実際の戦力」はこちらを使う。
+// ポジション適性(補正後)。チーム分析で使う「実際の戦力」はこちらを使う。
 function posPower(p, pos) { return posFit(p, pos) * posBonus(p, pos); }
 
 // 野手としての総合力(野手能力の加重平均)。投手選手でも野手基礎能力として常に計算する。
-// コンバート候補の判定(野手転向時の基礎能力)に使う。
 function overall(p) {
   let s = 0;
   Object.entries(config.overallWeights).forEach(([k, v]) => s += rank(p.abilities?.[k] || 'G') * v);
@@ -612,7 +611,6 @@ function evalMark(score, th) {
 }
 
 // ポジション判定の共通ロジック。実働最弱者のスコアと1人あたりの基準を比較して◎○△×を返す。
-// renderPositionAnalysis(表示)とrenderConvert(不足ポジション判定)の両方から使う。
 function evalPosition(rs, pos) {
   const topCount = config.topCounts[pos] || 2;
   const startingCount = config.startingCounts?.[pos] || 1;
@@ -627,49 +625,6 @@ function evalPosition(rs, pos) {
   const [mark, cls] = evalMark(weakestStarter, perPersonTh);
   const pct = Math.round(weakestStarter / perPersonTh.excellent * 100);
   return { list, weakestStarter, perPersonTh, mark, cls, pct };
-}
-
-// 指定ポジション(fromPos)から選手pを抜いた場合に、そのポジションに最低限のレギュラー(要注意基準1人分を満たす選手)が
-// 1人も残らなくなってしまうかを判定する。コンバート候補抽出時、「コンバート元が完全に薄くなる」選手を除外するために使う。
-// (2人合計の戦力ではなく、「最低1人は守れる人がいるか」という緩やかな基準にしている)
-function wouldWeaken(rs, p, fromPos) {
-  if (fromPos === '投手') return false; // 投手の層への影響はwouldWeakenPitchingで別途判定する
-
-  // 「最低限のレギュラー」のラインとして、要注意(warning)基準の1人分を使う
-  const perPersonMinimum = config.positionThresholds[fromPos].warning / config.topCounts[fromPos];
-
-  const remaining = rs
-    .filter(x => x.id !== p.id)
-    .map(x => posPower(x, fromPos))
-    .sort((a, b) => b - a);
-
-  const top = remaining[0] || 0;
-  return top < perPersonMinimum;
-}
-
-// 投手選手pを抜いた場合に、コンバート候補から除外すべきかを判定する。
-// (1)現在エース・中継ぎとして選出されている選手は、層に余裕があっても実際にその役割を担っているため除外する。
-// (2)抜いた結果、投手層の判定(◎○△×)が悪化する場合も除外する。
-// 野手のwouldWeaken()と対になる、投手専用のコンバート元判定。
-function wouldWeakenPitching(rs, p) {
-  if (p.main !== '投手') return false; // 投手以外には関係しない
-
-  const before = pitcherStaffEval(rs);
-  const currentRoleIds = new Set(before.byGrade.filter(x => x.p).map(x => x.p.id));
-  if (before.rel) currentRoleIds.add(before.rel.id);
-  if (currentRoleIds.has(p.id)) return true; // 現在エース・中継ぎを担っている選手は常に除外
-
-  const after = pitcherStaffEval(rs.filter(x => x.id !== p.id));
-  const rank = { '◎': 3, '○': 2, '△': 1, '×': 0 };
-  return rank[after.mark] < rank[before.mark];
-}
-
-// 選手pが現在守っている全ポジション(メイン＋サブ、投手を除く)を返す。
-// wouldWeaken() でコンバート元への影響を判定する際に使う。
-function convertSourcePositions(p) {
-  const list = [p.main];
-  (p.subs || []).forEach(s => list.push(s));
-  return list.filter(pos => pos !== '投手' && POS.includes(pos));
 }
 
 
@@ -695,7 +650,6 @@ function renderDashboard() {
   renderPositionAnalysis(rs);
   renderRadarChart(rs);
   renderPitcherAnalysis(rs);
-  renderConvert(rs);
 }
 
 // 6ポジションの戦力%をSVGレーダーチャートで描画する。
@@ -797,7 +751,6 @@ function renderPositionAnalysis(rs) {
 }
 
 // 投手層の評価(3年/2年/1年エース＋中継ぎ候補の理想形に対する判定)。
-// renderPitcherAnalysis(表示)とwouldWeakenPitching(コンバート判定)の両方から使う。
 function pitcherStaffEval(rs) {
   const ps = rs.filter(p => p.main === '投手' || (p.subs || []).includes('投手') || pitcherScore(p, 'overall') >= 3.5);
 
@@ -831,48 +784,6 @@ function renderPitcherAnalysis(rs) {
       <div>中継ぎ候補：${rel ? `${rel.name} ${score100(pitcherScore(rel, 'relief'))}` : 'なし'}</div>
     </div>
   `;
-}
-
-// 不足ポジション(◎に届いていないポジション)ごとに、コンバート候補を提案する。
-// 不足判定はevalPosition(renderPositionAnalysisと同じ基準)を使う。
-// 候補からは「コンバートすると元のポジション(野手ポジション、または投手層)が薄くなる選手」を除外する。
-function renderConvert(rs) {
-  const convertSuggestionsEl = document.getElementById('convertSuggestions');
-
-  const weak = ['捕手', '一塁', '二塁', '三塁', '遊撃', '外野']
-    .filter(pos => ['△', '×'].includes(evalPosition(rs, pos).mark));
-
-  convertSuggestionsEl.innerHTML = '';
-  if (!weak.length) {
-    convertSuggestionsEl.innerHTML = '<div class="card">大きな不足はありません。</div>';
-    return;
-  }
-
-  weak.forEach(pos => {
-    const cand = rs
-      .filter(p => {
-        // 既にメイン、またはサブ◎(メイン相当)で守れている選手は対象外。
-        // サブ○(0.7倍)の選手は、メイン格に格上げする提案として対象に含める。
-        if (p.main === pos || (p.subsHigh || []).includes(pos)) return false;
-        if (wouldWeakenPitching(rs, p)) return false; // コンバートすると投手層が薄くなる場合は除外
-        const sources = convertSourcePositions(p).filter(src => src !== pos); // 格上げ先(pos)自体はコンバート元チェックの対象外
-        if (!sources.length) return true;
-        return !sources.some(src => wouldWeaken(rs, p, src)); // 元の野手ポジションが薄くなる場合は除外
-      })
-      .map(p => ({ p, score: totalFieldScore(p, pos), fit: posFit(p, pos), isSub: (p.subs || []).includes(pos) }))
-      .sort((a, b) => b.score - a.score)
-      .slice(0, 3);
-
-    const div = document.createElement('div');
-    div.className = 'analysis-card';
-    div.innerHTML = `
-      <strong>${pos}候補</strong>
-      ${cand.length
-        ? cand.map(c => `<div class="player-head"><span>${c.p.name}（${c.p.main}${c.isSub ? `→${pos}・◎格上げ` : `→${pos}`}）</span><span>守備${score100(c.fit)} / 総合${score100(c.score)}</span></div>`).join('')
-        : '<div class="muted">該当選手なし（コンバート元が薄くなるため）</div>'}
-    `;
-    convertSuggestionsEl.appendChild(div);
-  });
 }
 
 // 選手のメインポジション以外で最も適性が高いポジションを返す(コンバート先の可能性の参考値)。
