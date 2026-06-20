@@ -914,8 +914,8 @@ function renderPlayers() {
     const card = document.createElement('div');
     card.className = 'player-card';
     const second = secondFit(p);
-    const manualSc = p.main === '投手' ? pitcherManualScore(p) : battingScore(p);
-    const autoSc   = p.main === '投手' ? pitcherAutoScore(p)   : fielderAutoScore(p);
+    const battingSc = p.main === '投手' ? pitcherManualScore(p) : battingScore(p);
+    const battingLabel = p.main === '投手' ? '投球' : '打撃';
     card.innerHTML = `
       <div class="player-head">
         <strong>${p.grade}年 ${POS_SHORT[p.main]} ${p.name}</strong>
@@ -924,8 +924,7 @@ function renderPlayers() {
       <div class="scores">
         <span class="badge">${POS_SHORT[p.main]}${score100(posFit(p, p.main))}</span>
         <span class="badge">→${POS_SHORT[second.pos]}${score100(second.fit)}</span>
-        <span class="badge">自操${score100(manualSc)}</span>
-        <span class="badge">オート${score100(autoSc)}</span>
+        <span class="badge">${battingLabel}${score100(battingSc)}</span>
       </div>
       ${(p.specialAbilities || []).length ? `
         <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
