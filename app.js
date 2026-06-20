@@ -33,6 +33,7 @@ const WEIGHT_KEY = 'eikan_manager_weights_v1'; // ポジション別重み設定
 
 // グローバルな状態
 let config = null;      // config.jsonの内容(評価ロジックの重み付け等)
+let specialAbilityMap = {}; // config.specialAbilities をname→定義でO(1)参照するためのキャッシュ
 let players = [];        // 全選手データ
 let current = null;      // 編集中の選手ID(新規登録時はnull)
 let formState = { grade: 1, main: '投手', subs: [], 弾道: 1 }; // 選手登録フォームの入力状態
@@ -47,6 +48,7 @@ async function init() {
     config = defaultConfig();
   }
   checkConfig();
+  specialAbilityMap = Object.fromEntries((config.specialAbilities || []).map(a => [a.name, a]));
   applyCustomWeights(); // localStorageに保存されたカスタム重みをconfig.positionWeightsに上書きする
   players = JSON.parse(localStorage.getItem(KEY) || '[]');
   buildForm();
@@ -72,7 +74,7 @@ const REQUIRED_CONFIG_KEYS = [
   'rankValues', 'positionBonus', 'topCounts', 'positionThresholds',
   'positionWeights', 'overallWeights', 'pitcherWeights', 'pitcherThresholds',
   'speedScale', 'pitchTypeScale', 'totalBreakScale',
-  'positionRoles', 'manualBaseWeights', 'autoBaseWeights'
+  'positionRoles', 'manualBaseWeights'
 ];
 
 // config.jsonの構造不備を検知し、不足キーがあれば標準値で補完しつつ画面上に警告を出す。
@@ -139,10 +141,6 @@ function defaultConfig() {
     manualBaseWeights: {
       野手: { ミート: 0.35, パワー: 0.30, 走力: 0.20, 弾道: 0.15 },
       投手: { 球速: 0.30, コントロール: 0.35, 総変化量: 0.25, 球種数: 0.10 }
-    },
-    autoBaseWeights: {
-      野手: { チャンス: 0.35, 対左投手: 0.25, キャッチャー: 0.20, 送球: 0.10, 守備力: 0.10 },
-      投手: { 対ピンチ: 0.30, 対左打者: 0.20, 打たれ強さ: 0.25, クイック: 0.10, スタミナ: 0.15 }
     }
   };
 }
@@ -504,30 +502,31 @@ function overall(p) {
 // 選手一覧・ダッシュボードなど「その選手の今のメイン仕事としての強さ」を見せる場所で使う。
 function mainOverall(p) { return p.main === '投手' ? pitcherScore(p, 'overall') : overall(p); }
 
-// 投手の総合力。type='ace'(エース適性)/'relief'(リリーフ適性)/'overall'(総合)で重み付けを切り替える。
-// ランク項目・数値項目(球速・球種数・総変化量)を混在して扱う。
-function pitcherScore(p, type = 'overall') {
-  const w = config.pitcherWeights[type];
+// 投手能力の加重合計。数値系(球速/球種数/総変化量)とランク系を統一して扱う共通コア。
+function pitcherWeightedSum(p, weights) {
   let s = 0;
-  Object.entries(w).forEach(([k, v]) => {
-    let val = 1;
+  Object.entries(weights).forEach(([k, v]) => {
+    let val;
     if (k === '球速') val = normSpeed(p.pitch?.球速 || 120);
     else if (k === '球種数') val = norm(p.pitch?.球種数 || 0, config.pitchTypeScale);
     else if (k === '総変化量') val = norm(p.pitch?.総変化量 || 0, config.totalBreakScale);
-    else val = rank(p.pitch?.[k] || 'G'); // コントロール・スタミナ・投手右上能力など
+    else val = rank(p.pitch?.[k] || 'G');
     s += val * v;
   });
   return s;
 }
 
-// 選手の特殊能力リストからmanualWeight/autoWeightの合計ボーナスを算出する
-function specialAbilityBonus(p, type) {
-  if (!config.specialAbilities || !p.specialAbilities?.length) return 0;
+// 投手の総合力。type='ace'(エース適性)/'relief'(リリーフ適性)/'overall'(総合)で重み付けを切り替える。
+function pitcherScore(p, type = 'overall') {
+  return pitcherWeightedSum(p, config.pitcherWeights[type]);
+}
+
+// 選手の特殊能力リストからmanualWeightの合計ボーナスを算出する
+function specialAbilityBonus(p) {
+  if (!p.specialAbilities?.length) return 0;
   return p.specialAbilities.reduce((sum, name) => {
-    const def = config.specialAbilities.find(a => a.name === name);
-    if (!def) return sum;
-    const w = type === 'manual' ? (def.manualWeight || 0) : (def.autoWeight || 0);
-    return sum + w;
+    const def = specialAbilityMap[name];
+    return sum + (def?.manualWeight || 0);
   }, 0);
 }
 
@@ -543,46 +542,13 @@ function battingScore(p) {
       s += rank(p.abilities?.[k] || 'G') * v;
     }
   });
-  s += specialAbilityBonus(p, 'manual');
+  s += specialAbilityBonus(p);
   return s;
 }
 
-// 投手の自操作適性(球速・コントロール・総変化量・球種数の加重平均 + 特殊能力ボーナス)
+// 投手の打撃スコア(カード表示用)。自操作打撃4指標 + 特殊能力ボーナス。
 function pitcherManualScore(p) {
-  const w = config.manualBaseWeights?.投手 || {};
-  let s = 0;
-  Object.entries(w).forEach(([k, v]) => {
-    if (k === '球速') s += normSpeed(p.pitch?.球速 || 120) * v;
-    else if (k === '総変化量') s += norm(p.pitch?.総変化量 || 0, config.totalBreakScale) * v;
-    else if (k === '球種数') s += norm(p.pitch?.球種数 || 0, config.pitchTypeScale) * v;
-    else s += rank(p.pitch?.[k] || 'G') * v;
-  });
-  s += specialAbilityBonus(p, 'manual');
-  return s;
-}
-
-// 野手のオート適性(チャンス・対左投手・キャッチャー・送球・守備力の加重平均 + 特殊能力ボーナス)
-// キャッチャーは捕手のみ加算(非捕手がキャッチャーランクを持っていても評価しない)
-function fielderAutoScore(p) {
-  const w = config.autoBaseWeights?.野手 || {};
-  let s = 0;
-  Object.entries(w).forEach(([k, v]) => {
-    if (k === 'キャッチャー' && p.main !== '捕手') return;
-    s += rank(p.abilities?.[k] || 'G') * v;
-  });
-  s += specialAbilityBonus(p, 'auto');
-  return s;
-}
-
-// 投手のオート適性(対ピンチ・対左打者・打たれ強さ・クイック・スタミナの加重平均 + 特殊能力ボーナス)
-function pitcherAutoScore(p) {
-  const w = config.autoBaseWeights?.投手 || {};
-  let s = 0;
-  Object.entries(w).forEach(([k, v]) => {
-    s += rank(p.pitch?.[k] || 'G') * v;
-  });
-  s += specialAbilityBonus(p, 'auto');
-  return s;
+  return pitcherWeightedSum(p, config.manualBaseWeights?.投手 || {}) + specialAbilityBonus(p);
 }
 
 // ポジション別の守備・打撃合算スコア。守備側にはposBonus(メイン/サブ/未経験補正)を適用する。
@@ -840,7 +806,7 @@ function renderPlayers() {
       ${(p.specialAbilities || []).length ? `
         <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
           ${(p.specialAbilities || []).map(name => {
-            const def = (config.specialAbilities || []).find(a => a.name === name);
+            const def = specialAbilityMap[name];
             const isMinus = def?.type === '赤特';
             const isGold  = def?.type === '金特';
             const color = isMinus ? 'var(--danger)' : isGold ? 'var(--warn)' : 'var(--primary)';
