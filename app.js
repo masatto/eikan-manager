@@ -33,6 +33,7 @@ const WEIGHT_KEY = 'eikan_manager_weights_v1'; // ポジション別重み設定
 
 // グローバルな状態
 let config = null;      // config.jsonの内容(評価ロジックの重み付け等)
+let specialAbilityMap = {}; // config.specialAbilities をname→定義でO(1)参照するためのキャッシュ
 let players = [];        // 全選手データ
 let current = null;      // 編集中の選手ID(新規登録時はnull)
 let formState = { grade: 1, main: '投手', subs: [], 弾道: 1 }; // 選手登録フォームの入力状態
@@ -47,6 +48,7 @@ async function init() {
     config = defaultConfig();
   }
   checkConfig();
+  specialAbilityMap = Object.fromEntries((config.specialAbilities || []).map(a => [a.name, a]));
   applyCustomWeights(); // localStorageに保存されたカスタム重みをconfig.positionWeightsに上書きする
   players = JSON.parse(localStorage.getItem(KEY) || '[]');
   buildForm();
@@ -71,7 +73,8 @@ function applyCustomWeights() {
 const REQUIRED_CONFIG_KEYS = [
   'rankValues', 'positionBonus', 'topCounts', 'positionThresholds',
   'positionWeights', 'overallWeights', 'pitcherWeights', 'pitcherThresholds',
-  'speedScale', 'pitchTypeScale', 'totalBreakScale'
+  'speedScale', 'pitchTypeScale', 'totalBreakScale',
+  'positionRoles', 'manualBaseWeights'
 ];
 
 // config.jsonの構造不備を検知し、不足キーがあれば標準値で補完しつつ画面上に警告を出す。
@@ -126,7 +129,19 @@ function defaultConfig() {
     pitcherThresholds: { ace: 5.2, relief: 4.8 },
     speedScale: { min: 120, max: 165 },
     pitchTypeScale: { min: 0, max: 7 },
-    totalBreakScale: { min: 0, max: 20 }
+    totalBreakScale: { min: 0, max: 20 },
+    positionRoles: {
+      捕手: { defense: 0.70, batting: 0.30 },
+      一塁: { defense: 0.40, batting: 0.60 },
+      二塁: { defense: 0.65, batting: 0.35 },
+      三塁: { defense: 0.45, batting: 0.55 },
+      遊撃: { defense: 0.70, batting: 0.30 },
+      外野: { defense: 0.35, batting: 0.65 }
+    },
+    manualBaseWeights: {
+      野手: { ミート: 0.35, パワー: 0.30, 走力: 0.20, 弾道: 0.15 },
+      投手: { 球速: 0.30, コントロール: 0.35, 総変化量: 0.25, 球種数: 0.10 }
+    }
   };
 }
 
@@ -473,11 +488,10 @@ function posBonus(p, pos) {
   return config.positionBonus.none;
 }
 
-// ポジション適性(補正後)。チーム分析・コンバート候補の判定で使う「実際の戦力」はこちらを使う。
+// ポジション適性(補正後)。チーム分析で使う「実際の戦力」はこちらを使う。
 function posPower(p, pos) { return posFit(p, pos) * posBonus(p, pos); }
 
 // 野手としての総合力(野手能力の加重平均)。投手選手でも野手基礎能力として常に計算する。
-// コンバート候補の判定(野手転向時の基礎能力)に使う。
 function overall(p) {
   let s = 0;
   Object.entries(config.overallWeights).forEach(([k, v]) => s += rank(p.abilities?.[k] || 'G') * v);
@@ -488,20 +502,61 @@ function overall(p) {
 // 選手一覧・ダッシュボードなど「その選手の今のメイン仕事としての強さ」を見せる場所で使う。
 function mainOverall(p) { return p.main === '投手' ? pitcherScore(p, 'overall') : overall(p); }
 
-// 投手の総合力。type='ace'(エース適性)/'relief'(リリーフ適性)/'overall'(総合)で重み付けを切り替える。
-// ランク項目・数値項目(球速・球種数・総変化量)を混在して扱う。
-function pitcherScore(p, type = 'overall') {
-  const w = config.pitcherWeights[type];
+// 投手能力の加重合計。数値系(球速/球種数/総変化量)とランク系を統一して扱う共通コア。
+function pitcherWeightedSum(p, weights) {
   let s = 0;
-  Object.entries(w).forEach(([k, v]) => {
-    let val = 1;
+  Object.entries(weights).forEach(([k, v]) => {
+    let val;
     if (k === '球速') val = normSpeed(p.pitch?.球速 || 120);
     else if (k === '球種数') val = norm(p.pitch?.球種数 || 0, config.pitchTypeScale);
     else if (k === '総変化量') val = norm(p.pitch?.総変化量 || 0, config.totalBreakScale);
-    else val = rank(p.pitch?.[k] || 'G'); // コントロール・スタミナ・投手右上能力など
+    else val = rank(p.pitch?.[k] || 'G');
     s += val * v;
   });
   return s;
+}
+
+// 投手の総合力。type='ace'(エース適性)/'relief'(リリーフ適性)/'overall'(総合)で重み付けを切り替える。
+function pitcherScore(p, type = 'overall') {
+  return pitcherWeightedSum(p, config.pitcherWeights[type]);
+}
+
+// 選手の特殊能力リストからmanualWeightの合計ボーナスを算出する
+function specialAbilityBonus(p) {
+  if (!p.specialAbilities?.length) return 0;
+  return p.specialAbilities.reduce((sum, name) => {
+    const def = specialAbilityMap[name];
+    return sum + (def?.manualWeight || 0);
+  }, 0);
+}
+
+// 野手の自操作適性(ミート・パワー・走力・弾道の加重平均 + 特殊能力ボーナス)
+function battingScore(p) {
+  const w = config.manualBaseWeights?.野手 || {};
+  let s = 0;
+  Object.entries(w).forEach(([k, v]) => {
+    if (k === '弾道') {
+      const val = p.abilities?.弾道 || 1;
+      s += (1 + (val - 1) / 3 * 7) * v;
+    } else {
+      s += rank(p.abilities?.[k] || 'G') * v;
+    }
+  });
+  s += specialAbilityBonus(p);
+  return s;
+}
+
+// 投手の打撃スコア(カード表示用)。自操作打撃4指標 + 特殊能力ボーナス。
+function pitcherManualScore(p) {
+  return pitcherWeightedSum(p, config.manualBaseWeights?.投手 || {}) + specialAbilityBonus(p);
+}
+
+// ポジション別の守備・打撃合算スコア。守備側にはposBonus(メイン/サブ/未経験補正)を適用する。
+// 投手は既存のpitcherScore(overall)をそのまま返す。
+function totalFieldScore(p, pos) {
+  if (pos === '投手') return pitcherScore(p, 'overall');
+  const roles = config.positionRoles?.[pos] || { defense: 0.55, batting: 0.45 };
+  return posPower(p, pos) * roles.defense + battingScore(p) * roles.batting;
 }
 
 // 1〜8スケールのスコアを0〜100点満点の表示用スコアに変換
@@ -522,12 +577,11 @@ function evalMark(score, th) {
 }
 
 // ポジション判定の共通ロジック。実働最弱者のスコアと1人あたりの基準を比較して◎○△×を返す。
-// renderPositionAnalysis(表示)とrenderConvert(不足ポジション判定)の両方から使う。
 function evalPosition(rs, pos) {
   const topCount = config.topCounts[pos] || 2;
   const startingCount = config.startingCounts?.[pos] || 1;
   const list = rs
-    .map(p => ({ p, score: posPower(p, pos), fit: posFit(p, pos), bonus: posBonus(p, pos) }))
+    .map(p => ({ p, score: totalFieldScore(p, pos), fit: posFit(p, pos), bonus: posBonus(p, pos) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, topCount);
 
@@ -537,49 +591,6 @@ function evalPosition(rs, pos) {
   const [mark, cls] = evalMark(weakestStarter, perPersonTh);
   const pct = Math.round(weakestStarter / perPersonTh.excellent * 100);
   return { list, weakestStarter, perPersonTh, mark, cls, pct };
-}
-
-// 指定ポジション(fromPos)から選手pを抜いた場合に、そのポジションに最低限のレギュラー(要注意基準1人分を満たす選手)が
-// 1人も残らなくなってしまうかを判定する。コンバート候補抽出時、「コンバート元が完全に薄くなる」選手を除外するために使う。
-// (2人合計の戦力ではなく、「最低1人は守れる人がいるか」という緩やかな基準にしている)
-function wouldWeaken(rs, p, fromPos) {
-  if (fromPos === '投手') return false; // 投手の層への影響はwouldWeakenPitchingで別途判定する
-
-  // 「最低限のレギュラー」のラインとして、要注意(warning)基準の1人分を使う
-  const perPersonMinimum = config.positionThresholds[fromPos].warning / config.topCounts[fromPos];
-
-  const remaining = rs
-    .filter(x => x.id !== p.id)
-    .map(x => posPower(x, fromPos))
-    .sort((a, b) => b - a);
-
-  const top = remaining[0] || 0;
-  return top < perPersonMinimum;
-}
-
-// 投手選手pを抜いた場合に、コンバート候補から除外すべきかを判定する。
-// (1)現在エース・中継ぎとして選出されている選手は、層に余裕があっても実際にその役割を担っているため除外する。
-// (2)抜いた結果、投手層の判定(◎○△×)が悪化する場合も除外する。
-// 野手のwouldWeaken()と対になる、投手専用のコンバート元判定。
-function wouldWeakenPitching(rs, p) {
-  if (p.main !== '投手') return false; // 投手以外には関係しない
-
-  const before = pitcherStaffEval(rs);
-  const currentRoleIds = new Set(before.byGrade.filter(x => x.p).map(x => x.p.id));
-  if (before.rel) currentRoleIds.add(before.rel.id);
-  if (currentRoleIds.has(p.id)) return true; // 現在エース・中継ぎを担っている選手は常に除外
-
-  const after = pitcherStaffEval(rs.filter(x => x.id !== p.id));
-  const rank = { '◎': 3, '○': 2, '△': 1, '×': 0 };
-  return rank[after.mark] < rank[before.mark];
-}
-
-// 選手pが現在守っている全ポジション(メイン＋サブ、投手を除く)を返す。
-// wouldWeaken() でコンバート元への影響を判定する際に使う。
-function convertSourcePositions(p) {
-  const list = [p.main];
-  (p.subs || []).forEach(s => list.push(s));
-  return list.filter(pos => pos !== '投手' && POS.includes(pos));
 }
 
 
@@ -605,7 +616,6 @@ function renderDashboard() {
   renderPositionAnalysis(rs);
   renderRadarChart(rs);
   renderPitcherAnalysis(rs);
-  renderConvert(rs);
 }
 
 // 6ポジションの戦力%をSVGレーダーチャートで描画する。
@@ -699,7 +709,7 @@ function renderPositionAnalysis(rs) {
       <div class="eval ${cls}">${mark}</div>
       <div>
         <div>戦力 ${pct}%</div>
-        ${list.map(x => `<span class="badge">${x.p.name} ${score100(x.fit)}${x.bonus < 1 ? '×' + x.bonus : ''}</span>`).join('')}
+        ${list.map(x => `<span class="badge">${x.p.name} ${score100(x.score)}${x.bonus < 1 ? '×' + x.bonus : ''}</span>`).join('')}
       </div>
     `;
     positionAnalysisEl.appendChild(row);
@@ -707,7 +717,6 @@ function renderPositionAnalysis(rs) {
 }
 
 // 投手層の評価(3年/2年/1年エース＋中継ぎ候補の理想形に対する判定)。
-// renderPitcherAnalysis(表示)とwouldWeakenPitching(コンバート判定)の両方から使う。
 function pitcherStaffEval(rs) {
   const ps = rs.filter(p => p.main === '投手' || (p.subs || []).includes('投手') || pitcherScore(p, 'overall') >= 3.5);
 
@@ -741,48 +750,6 @@ function renderPitcherAnalysis(rs) {
       <div>中継ぎ候補：${rel ? `${rel.name} ${score100(pitcherScore(rel, 'relief'))}` : 'なし'}</div>
     </div>
   `;
-}
-
-// 不足ポジション(◎に届いていないポジション)ごとに、コンバート候補を提案する。
-// 不足判定はevalPosition(renderPositionAnalysisと同じ基準)を使う。
-// 候補からは「コンバートすると元のポジション(野手ポジション、または投手層)が薄くなる選手」を除外する。
-function renderConvert(rs) {
-  const convertSuggestionsEl = document.getElementById('convertSuggestions');
-
-  const weak = ['捕手', '一塁', '二塁', '三塁', '遊撃', '外野']
-    .filter(pos => ['△', '×'].includes(evalPosition(rs, pos).mark));
-
-  convertSuggestionsEl.innerHTML = '';
-  if (!weak.length) {
-    convertSuggestionsEl.innerHTML = '<div class="card">大きな不足はありません。</div>';
-    return;
-  }
-
-  weak.forEach(pos => {
-    const cand = rs
-      .filter(p => {
-        // 既にメイン、またはサブ◎(メイン相当)で守れている選手は対象外。
-        // サブ○(0.7倍)の選手は、メイン格に格上げする提案として対象に含める。
-        if (p.main === pos || (p.subsHigh || []).includes(pos)) return false;
-        if (wouldWeakenPitching(rs, p)) return false; // コンバートすると投手層が薄くなる場合は除外
-        const sources = convertSourcePositions(p).filter(src => src !== pos); // 格上げ先(pos)自体はコンバート元チェックの対象外
-        if (!sources.length) return true;
-        return !sources.some(src => wouldWeaken(rs, p, src)); // 元の野手ポジションが薄くなる場合は除外
-      })
-      .map(p => ({ p, fit: posFit(p, pos), overall: overall(p), isSub: (p.subs || []).includes(pos) }))
-      .sort((a, b) => (b.fit + b.overall * .2) - (a.fit + a.overall * .2))
-      .slice(0, 3);
-
-    const div = document.createElement('div');
-    div.className = 'analysis-card';
-    div.innerHTML = `
-      <strong>${pos}候補</strong>
-      ${cand.length
-        ? cand.map(c => `<div class="player-head"><span>${c.p.name}（${c.p.main}${c.isSub ? `→${pos}・◎格上げ` : `→${pos}`}）</span><span>適性${score100(c.fit)} / 総合${score100(c.overall)}</span></div>`).join('')
-        : '<div class="muted">該当選手なし（コンバート元が薄くなるため）</div>'}
-    `;
-    convertSuggestionsEl.appendChild(div);
-  });
 }
 
 // 選手のメインポジション以外で最も適性が高いポジションを返す(コンバート先の可能性の参考値)。
@@ -824,6 +791,8 @@ function renderPlayers() {
     const card = document.createElement('div');
     card.className = 'player-card';
     const second = secondFit(p);
+    const battingSc = p.main === '投手' ? pitcherManualScore(p) : battingScore(p);
+    const battingLabel = p.main === '投手' ? '投球' : '打撃';
     card.innerHTML = `
       <div class="player-head">
         <strong>${p.grade}年 ${POS_SHORT[p.main]} ${p.name}</strong>
@@ -832,11 +801,12 @@ function renderPlayers() {
       <div class="scores">
         <span class="badge">${POS_SHORT[p.main]}${score100(posFit(p, p.main))}</span>
         <span class="badge">→${POS_SHORT[second.pos]}${score100(second.fit)}</span>
+        <span class="badge">${battingLabel}${score100(battingSc)}</span>
       </div>
       ${(p.specialAbilities || []).length ? `
         <div style="margin-top:6px;display:flex;flex-wrap:wrap;gap:4px">
           ${(p.specialAbilities || []).map(name => {
-            const def = (config.specialAbilities || []).find(a => a.name === name);
+            const def = specialAbilityMap[name];
             const isMinus = def?.type === '赤特';
             const isGold  = def?.type === '金特';
             const color = isMinus ? 'var(--danger)' : isGold ? 'var(--warn)' : 'var(--primary)';
@@ -1141,7 +1111,7 @@ function renderLineup() {
   const activeTab = el.dataset.activeTab || 'real';
 
   // 現実案: 全選手対象
-  const realPlan = solveLineup(rs, (p, pos) => posPower(p, pos));
+  const realPlan = solveLineup(rs, (p, pos) => totalFieldScore(p, pos));
 
   // 理想案の計算:
   // 1. 固定(idealFixed)と仮配置(idealTemp)の選手を事前に割り当て
@@ -1164,7 +1134,7 @@ function renderLineup() {
         }
         return 0;
       }
-      return posFit(p, pos);
+      return totalFieldScore(p, pos);
     });
   }
   const idealPlan = calcIdealPlan();
@@ -1175,7 +1145,7 @@ function renderLineup() {
     const rows = FIELD_POS.map((pos, i) => {
       const p = realPlan.assigned.get(i);
       if (!p) return `<div class="lineup-row"><span class="lineup-pos">${LABELS[i]}</span><span class="muted">未割当</span></div>`;
-      const s = score100(posPower(p, pos));
+      const s = score100(totalFieldScore(p, pos));
       const bonus = posBonus(p, pos);
       const bonusTag = bonus < 1 ? `<span class="lineup-bonus">×${bonus}</span>` : '';
       const { mark, cls } = evalPosition(rs, pos);
@@ -1232,7 +1202,7 @@ function renderLineup() {
           <span class="lineup-score">-</span>
         </div>`;
 
-      const s = score100(posFit(p, pos));
+      const s = score100(totalFieldScore(p, pos));
       const bonus = posBonus(p, pos);
       const needConvert = p.main !== pos && !(p.subsHigh || []).includes(pos);
       const needUpgrade = p.main !== pos && (p.subs || []).includes(pos) && !(p.subsHigh || []).includes(pos);
@@ -1249,10 +1219,10 @@ function renderLineup() {
       const perPersonTh = { excellent: th.excellent / topCount, good: th.good / topCount, warning: th.warning / topCount };
       if (pos === '外野') {
         const outScores = FIELD_POS.map((fp, fi) => fp === '外野' ? idealPlan.assigned.get(fi) : null)
-          .filter(Boolean).map(fp => posFit(fp, '外野')).sort((a, b) => a - b);
+          .filter(Boolean).map(fp => totalFieldScore(fp, '外野')).sort((a, b) => a - b);
         [mark, cls] = evalMark(outScores[0] || 0, perPersonTh);
       } else {
-        [mark, cls] = evalMark(posFit(p, pos), perPersonTh);
+        [mark, cls] = evalMark(totalFieldScore(p, pos), perPersonTh);
       }
 
       return `
