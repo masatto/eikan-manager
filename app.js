@@ -586,12 +586,12 @@ function pitcherAutoScore(p) {
   return s;
 }
 
-// ポジション別の守備・打撃合算スコア(表示用・参考値)
-// 投手は既存のpitcherScore(overall)をそのまま返す
+// ポジション別の守備・打撃合算スコア。守備側にはposBonus(メイン/サブ/未経験補正)を適用する。
+// 投手は既存のpitcherScore(overall)をそのまま返す。
 function totalFieldScore(p, pos) {
   if (pos === '投手') return pitcherScore(p, 'overall');
   const roles = config.positionRoles?.[pos] || { defense: 0.55, batting: 0.45 };
-  return posFit(p, pos) * roles.defense + battingScore(p) * roles.batting;
+  return posPower(p, pos) * roles.defense + battingScore(p) * roles.batting;
 }
 
 // 1〜8スケールのスコアを0〜100点満点の表示用スコアに変換
@@ -617,7 +617,7 @@ function evalPosition(rs, pos) {
   const topCount = config.topCounts[pos] || 2;
   const startingCount = config.startingCounts?.[pos] || 1;
   const list = rs
-    .map(p => ({ p, score: posPower(p, pos), fit: posFit(p, pos), bonus: posBonus(p, pos) }))
+    .map(p => ({ p, score: totalFieldScore(p, pos), fit: posFit(p, pos), bonus: posBonus(p, pos) }))
     .sort((a, b) => b.score - a.score)
     .slice(0, topCount);
 
@@ -789,7 +789,7 @@ function renderPositionAnalysis(rs) {
       <div class="eval ${cls}">${mark}</div>
       <div>
         <div>戦力 ${pct}%</div>
-        ${list.map(x => `<span class="badge">${x.p.name} ${score100(x.fit)}${x.bonus < 1 ? '×' + x.bonus : ''}</span>`).join('')}
+        ${list.map(x => `<span class="badge">${x.p.name} ${score100(x.score)}${x.bonus < 1 ? '×' + x.bonus : ''}</span>`).join('')}
       </div>
     `;
     positionAnalysisEl.appendChild(row);
@@ -859,8 +859,8 @@ function renderConvert(rs) {
         if (!sources.length) return true;
         return !sources.some(src => wouldWeaken(rs, p, src)); // 元の野手ポジションが薄くなる場合は除外
       })
-      .map(p => ({ p, fit: posFit(p, pos), overall: overall(p), isSub: (p.subs || []).includes(pos) }))
-      .sort((a, b) => (b.fit + b.overall * .2) - (a.fit + a.overall * .2))
+      .map(p => ({ p, score: totalFieldScore(p, pos), fit: posFit(p, pos), isSub: (p.subs || []).includes(pos) }))
+      .sort((a, b) => b.score - a.score)
       .slice(0, 3);
 
     const div = document.createElement('div');
@@ -868,7 +868,7 @@ function renderConvert(rs) {
     div.innerHTML = `
       <strong>${pos}候補</strong>
       ${cand.length
-        ? cand.map(c => `<div class="player-head"><span>${c.p.name}（${c.p.main}${c.isSub ? `→${pos}・◎格上げ` : `→${pos}`}）</span><span>適性${score100(c.fit)} / 総合${score100(c.overall)}</span></div>`).join('')
+        ? cand.map(c => `<div class="player-head"><span>${c.p.name}（${c.p.main}${c.isSub ? `→${pos}・◎格上げ` : `→${pos}`}）</span><span>守備${score100(c.fit)} / 総合${score100(c.score)}</span></div>`).join('')
         : '<div class="muted">該当選手なし（コンバート元が薄くなるため）</div>'}
     `;
     convertSuggestionsEl.appendChild(div);
@@ -1234,7 +1234,7 @@ function renderLineup() {
   const activeTab = el.dataset.activeTab || 'real';
 
   // 現実案: 全選手対象
-  const realPlan = solveLineup(rs, (p, pos) => posPower(p, pos));
+  const realPlan = solveLineup(rs, (p, pos) => totalFieldScore(p, pos));
 
   // 理想案の計算:
   // 1. 固定(idealFixed)と仮配置(idealTemp)の選手を事前に割り当て
@@ -1257,7 +1257,7 @@ function renderLineup() {
         }
         return 0;
       }
-      return posFit(p, pos);
+      return totalFieldScore(p, pos);
     });
   }
   const idealPlan = calcIdealPlan();
@@ -1268,7 +1268,7 @@ function renderLineup() {
     const rows = FIELD_POS.map((pos, i) => {
       const p = realPlan.assigned.get(i);
       if (!p) return `<div class="lineup-row"><span class="lineup-pos">${LABELS[i]}</span><span class="muted">未割当</span></div>`;
-      const s = score100(posPower(p, pos));
+      const s = score100(totalFieldScore(p, pos));
       const bonus = posBonus(p, pos);
       const bonusTag = bonus < 1 ? `<span class="lineup-bonus">×${bonus}</span>` : '';
       const { mark, cls } = evalPosition(rs, pos);
@@ -1325,7 +1325,7 @@ function renderLineup() {
           <span class="lineup-score">-</span>
         </div>`;
 
-      const s = score100(posFit(p, pos));
+      const s = score100(totalFieldScore(p, pos));
       const bonus = posBonus(p, pos);
       const needConvert = p.main !== pos && !(p.subsHigh || []).includes(pos);
       const needUpgrade = p.main !== pos && (p.subs || []).includes(pos) && !(p.subsHigh || []).includes(pos);
@@ -1342,10 +1342,10 @@ function renderLineup() {
       const perPersonTh = { excellent: th.excellent / topCount, good: th.good / topCount, warning: th.warning / topCount };
       if (pos === '外野') {
         const outScores = FIELD_POS.map((fp, fi) => fp === '外野' ? idealPlan.assigned.get(fi) : null)
-          .filter(Boolean).map(fp => posFit(fp, '外野')).sort((a, b) => a - b);
+          .filter(Boolean).map(fp => totalFieldScore(fp, '外野')).sort((a, b) => a - b);
         [mark, cls] = evalMark(outScores[0] || 0, perPersonTh);
       } else {
-        [mark, cls] = evalMark(posFit(p, pos), perPersonTh);
+        [mark, cls] = evalMark(totalFieldScore(p, pos), perPersonTh);
       }
 
       return `
