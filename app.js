@@ -559,6 +559,17 @@ function totalFieldScore(p, pos) {
   return posPower(p, pos) * roles.defense + battingScore(p) * roles.batting;
 }
 
+// 理想案最適化用スコア。posBonus(現状のメイン/サブ/未経験補正)を除いた生の適性で評価する。
+// 「コンバートした場合の可能性」でポジションを割り当てることで、
+// ①控え選手がコンバートで主力になれるケース
+// ②スタメン内のポジション変更で全体底上げできるケース
+// を理想案として浮上させる。表示スコアはtotalFieldScore(posBonus込み)を使う。
+function totalFieldScoreIdeal(p, pos) {
+  if (pos === '投手') return pitcherScore(p, 'overall');
+  const roles = config.positionRoles?.[pos] || { defense: 0.55, batting: 0.45 };
+  return posFit(p, pos) * roles.defense + battingScore(p) * roles.batting;
+}
+
 // 1〜8スケールのスコアを0〜100点満点の表示用スコアに変換
 function score100(v) { return Math.round(v / 8 * 100); }
 
@@ -1134,7 +1145,7 @@ function renderLineup() {
         }
         return 0;
       }
-      return totalFieldScore(p, pos);
+      return totalFieldScoreIdeal(p, pos);
     });
   }
   const idealPlan = calcIdealPlan();
@@ -1173,6 +1184,34 @@ function renderLineup() {
 
   // --- 理想案の描画 ---
   function idealPlanHtml() {
+    // 案A: チーム総合スコア(現実案 vs 理想案)をヘッダーに表示
+    const realTotal  = FIELD_POS.reduce((sum, fpos, fi) => {
+      const fp = realPlan.assigned.get(fi);
+      return sum + (fp ? score100(totalFieldScore(fp, fpos)) : 0);
+    }, 0);
+    const idealTotal = FIELD_POS.reduce((sum, fpos, fi) => {
+      const fp = idealPlan.assigned.get(fi);
+      return sum + (fp ? score100(totalFieldScoreIdeal(fp, fpos)) : 0);
+    }, 0);
+    const totalDiff = idealTotal - realTotal;
+    const teamScoreLine = `
+      <div style="font-size:13px;padding:6px 10px;margin-bottom:10px;border-radius:6px;border:1px solid var(--border);display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <span style="color:var(--muted)">チーム総合スコア</span>
+        <span>現実 <strong>${realTotal}</strong></span>
+        <span style="color:var(--muted)">→</span>
+        <span>理想 <strong style="color:var(--primary)">${idealTotal}</strong></span>
+        <span style="color:${totalDiff >= 0 ? 'var(--ok)' : 'var(--danger)'}; font-weight:700">(${totalDiff >= 0 ? '+' : ''}${totalDiff})</span>
+      </div>`;
+
+    // 外野の新旧入替を事前に計算する。
+    // 「理想案で新たに外野に入った選手」と「現実案から外野を外れた選手」を1対1で対応付けし、
+    // 各行の比較表示に使う(インデックス依存の比較ではなく顔ぶれの変化を正確に示す)。
+    const _realOF    = [5, 6, 7].map(fi => realPlan.assigned.get(fi)).filter(Boolean);
+    const _idealOF   = [5, 6, 7].map(fi => idealPlan.assigned.get(fi)).filter(Boolean);
+    const _droppedOF = _realOF.filter(rp => !_idealOF.some(ip => ip.id === rp.id));
+    const _newOF     = _idealOF.filter(ip => !_realOF.some(rp => rp.id === ip.id));
+    const outfieldReplacement = new Map(_newOF.map((ip, idx) => [ip.id, _droppedOF[idx]]));
+
     const rows = FIELD_POS.map((pos, i) => {
       const p = idealPlan.assigned.get(i);
       const curId = p ? p.id : '';
@@ -1202,27 +1241,44 @@ function renderLineup() {
           <span class="lineup-score">-</span>
         </div>`;
 
-      const s = score100(totalFieldScore(p, pos));
-      const bonus = posBonus(p, pos);
+      const sIdeal   = score100(totalFieldScoreIdeal(p, pos));
+      const sCurrent = score100(totalFieldScore(p, pos));
       const needConvert = p.main !== pos && !(p.subsHigh || []).includes(pos);
       const needUpgrade = p.main !== pos && (p.subs || []).includes(pos) && !(p.subsHigh || []).includes(pos);
-      const bonusTag = bonus < 1 ? `<span class="lineup-bonus">×${bonus}→×1.0</span>` : '';
       const convertTag = needConvert
-        ? `<span style="font-size:10px;color:var(--danger);margin-left:4px">${needUpgrade ? '◎格上げ' : 'コンバート'}</span>`
+        ? `<span style="font-size:10px;color:${needUpgrade ? 'var(--warn)' : 'var(--danger)'};margin-left:4px">${needUpgrade ? '◎格上げ' : 'コンバート'}</span>`
         : '';
       const nameColor = needConvert ? 'color:var(--danger)' : '';
+      // コンバートが必要な場合は「現状→理想」を表示してギャップを可視化する
+      const scoreDisplay = needConvert
+        ? `<span style="font-size:10px;color:var(--muted)">${sCurrent}→</span>${sIdeal}`
+        : `${sIdeal}`;
 
-      // 配置後評価
+      // 案B: 現実案との差分表示
+      // 外野は outfieldReplacement(新規→脱落の対応Map)を使い、
+      // 「この理想案外野手が誰に取って代わったか」を正確に表示する。
+      let realDiff = '';
+      if (pos === '外野') {
+        const replaced = outfieldReplacement.get(curId);
+        if (replaced)
+          realDiff = `<span style="font-size:11px;color:var(--muted)">現実外野: ${replaced.name} ${score100(totalFieldScore(replaced, pos))}</span>`;
+      } else {
+        const realP = realPlan.assigned.get(i);
+        if (realP && realP.id !== curId)
+          realDiff = `<span style="font-size:11px;color:var(--muted)">現実: ${realP.name} ${score100(totalFieldScore(realP, pos))}</span>`;
+      }
+
+      // ◎○△×: コンバート後の理想スコアで評価する
       let mark, cls;
       const topCount = config.topCounts[pos] || 2;
       const th = config.positionThresholds[pos];
       const perPersonTh = { excellent: th.excellent / topCount, good: th.good / topCount, warning: th.warning / topCount };
       if (pos === '外野') {
         const outScores = FIELD_POS.map((fp, fi) => fp === '外野' ? idealPlan.assigned.get(fi) : null)
-          .filter(Boolean).map(fp => totalFieldScore(fp, '外野')).sort((a, b) => a - b);
+          .filter(Boolean).map(fp => totalFieldScoreIdeal(fp, '外野')).sort((a, b) => a - b);
         [mark, cls] = evalMark(outScores[0] || 0, perPersonTh);
       } else {
-        [mark, cls] = evalMark(totalFieldScore(p, pos), perPersonTh);
+        [mark, cls] = evalMark(totalFieldScoreIdeal(p, pos), perPersonTh);
       }
 
       return `
@@ -1230,11 +1286,12 @@ function renderLineup() {
           <span class="lineup-pos">${LABELS[i]}</span>
           <div>
             <select style="width:100%;padding:5px 8px;font-size:12px" onchange="onIdealChange(${i},this.value)">${options}</select>
-            <span style="${nameColor}">${bonusTag}${convertTag}</span>
+            <span style="${nameColor}">${convertTag}</span>
+            ${realDiff}
           </div>
           ${fixBtn}
           <span class="eval ${cls}" style="font-size:16px">${mark}</span>
-          <span class="lineup-score">${s}</span>
+          <span class="lineup-score">${scoreDisplay}</span>
         </div>`;
     }).join('');
 
@@ -1300,7 +1357,7 @@ function renderLineup() {
       <h3>このスタメンを実現するために必要な変更</h3>
       <div class="muted" style="font-size:13px">コンバート不要です。</div>`;
 
-    return `<div style="margin-top:10px">${rows}${dhRow}</div><div style="margin-top:12px">${benchRows}${convertSection}</div>`;
+    return `<div style="margin-top:10px">${teamScoreLine}${rows}${dhRow}</div><div style="margin-top:12px">${benchRows}${convertSection}</div>`;
   }
 
   // --- タブバー ---
