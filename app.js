@@ -1203,6 +1203,15 @@ function renderLineup() {
         <span style="color:${totalDiff >= 0 ? 'var(--ok)' : 'var(--danger)'}; font-weight:700">(${totalDiff >= 0 ? '+' : ''}${totalDiff})</span>
       </div>`;
 
+    // 外野の新旧入替を事前に計算する。
+    // 「理想案で新たに外野に入った選手」と「現実案から外野を外れた選手」を1対1で対応付けし、
+    // 各行の比較表示に使う(インデックス依存の比較ではなく顔ぶれの変化を正確に示す)。
+    const _realOF    = [5, 6, 7].map(fi => realPlan.assigned.get(fi)).filter(Boolean);
+    const _idealOF   = [5, 6, 7].map(fi => idealPlan.assigned.get(fi)).filter(Boolean);
+    const _droppedOF = _realOF.filter(rp => !_idealOF.some(ip => ip.id === rp.id));
+    const _newOF     = _idealOF.filter(ip => !_realOF.some(rp => rp.id === ip.id));
+    const outfieldReplacement = new Map(_newOF.map((ip, idx) => [ip.id, _droppedOF[idx]]));
+
     const rows = FIELD_POS.map((pos, i) => {
       const p = idealPlan.assigned.get(i);
       const curId = p ? p.id : '';
@@ -1246,21 +1255,13 @@ function renderLineup() {
         : `${sIdeal}`;
 
       // 案B: 現実案との差分表示
-      // 外野は左翼/中堅/右翼の割り当て順序に意味がないため、インデックス一致ではなく
-      // 「理想案の選手が現実案の外野3枠のいずれかに存在するか」で判定する。
-      // 枠内の移動(例: 左翼→右翼)は差分なし扱いとし、外野の顔ぶれが変わる場合のみ表示する。
-      // また現実案の比較対象選手が理想案外野にまだ存在する場合(単なる枠内移動)も表示しない。
+      // 外野は outfieldReplacement(新規→脱落の対応Map)を使い、
+      // 「この理想案外野手が誰に取って代わったか」を正確に表示する。
       let realDiff = '';
       if (pos === '外野') {
-        const realOutfielders = [5, 6, 7].map(fi => realPlan.assigned.get(fi)).filter(Boolean);
-        const idealOutfielders = [5, 6, 7].map(fi => idealPlan.assigned.get(fi)).filter(Boolean);
-        const isInRealOutfield = realOutfielders.some(fp => fp.id === curId);
-        if (!isInRealOutfield) {
-          const realP = realPlan.assigned.get(i);
-          const realPStillInIdeal = realP && idealOutfielders.some(ip => ip.id === realP.id);
-          if (realP && !realPStillInIdeal)
-            realDiff = `<span style="font-size:11px;color:var(--muted)">現実外野: ${realP.name} ${score100(totalFieldScore(realP, pos))}</span>`;
-        }
+        const replaced = outfieldReplacement.get(curId);
+        if (replaced)
+          realDiff = `<span style="font-size:11px;color:var(--muted)">現実外野: ${replaced.name} ${score100(totalFieldScore(replaced, pos))}</span>`;
       } else {
         const realP = realPlan.assigned.get(i);
         if (realP && realP.id !== curId)
