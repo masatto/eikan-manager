@@ -1249,13 +1249,17 @@ function renderLineup() {
       // 外野は左翼/中堅/右翼の割り当て順序に意味がないため、インデックス一致ではなく
       // 「理想案の選手が現実案の外野3枠のいずれかに存在するか」で判定する。
       // 枠内の移動(例: 左翼→右翼)は差分なし扱いとし、外野の顔ぶれが変わる場合のみ表示する。
+      // また現実案の比較対象選手が理想案外野にまだ存在する場合(単なる枠内移動)も表示しない。
       let realDiff = '';
       if (pos === '外野') {
         const realOutfielders = [5, 6, 7].map(fi => realPlan.assigned.get(fi)).filter(Boolean);
+        const idealOutfielders = [5, 6, 7].map(fi => idealPlan.assigned.get(fi)).filter(Boolean);
         const isInRealOutfield = realOutfielders.some(fp => fp.id === curId);
         if (!isInRealOutfield) {
           const realP = realPlan.assigned.get(i);
-          if (realP) realDiff = `<span style="font-size:11px;color:var(--muted)">現実外野: ${realP.name} ${score100(totalFieldScore(realP, pos))}</span>`;
+          const realPStillInIdeal = realP && idealOutfielders.some(ip => ip.id === realP.id);
+          if (realP && !realPStillInIdeal)
+            realDiff = `<span style="font-size:11px;color:var(--muted)">現実外野: ${realP.name} ${score100(totalFieldScore(realP, pos))}</span>`;
         }
       } else {
         const realP = realPlan.assigned.get(i);
