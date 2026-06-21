@@ -24,6 +24,7 @@
     <button data-screen="players">選手一覧</button>
     <button data-screen="edit">選手登録</button>
     <button data-screen="lineup">スタメン</button>
+    <button data-screen="training">育成</button>
     <button data-screen="tools">入出力</button>
     <button data-screen="settings">設定</button>
   </nav>
@@ -147,6 +148,15 @@
       </div>
       <p class="muted">投手を除く野手から最適な9人+DHを自動選出します。×判定のポジションを優先して埋め、出場機会のない選手を活用します。</p>
       <div id="lineupResult"></div>
+    </section>
+
+    <!-- ===== 育成タブ: 能力強化推奨（チーム視点・選手視点） ===== -->
+    <section id="training" class="screen">
+      <div class="row">
+        <h2>育成強化推奨</h2>
+      </div>
+      <p class="muted">理想スタメンをベースに、各ポジション・各選手の戦力向上に最も効く能力強化を表示します。コンバート候補はコンバート後ポジションでの向上幅を計算します。</p>
+      <div id="trainingResult"></div>
     </section>
 
     <!-- ===== 入出力タブ: JSONバックアップの出力・読込 ===== -->

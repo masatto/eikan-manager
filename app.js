@@ -169,6 +169,7 @@ function show(id) {
   if (id === 'dashboard') renderDashboard();
   if (id === 'players') renderPlayers();
   if (id === 'lineup') renderLineup();
+  if (id === 'training') renderTraining();
   if (id === 'settings') renderWeightSettings();
 }
 
@@ -572,6 +573,59 @@ function totalFieldScoreIdeal(p, pos) {
 
 // 1〜8スケールのスコアを0〜100点満点の表示用スコアに変換
 function score100(v) { return Math.round(v / 8 * 100); }
+
+// 選手の指定能力を1段階アップした仮の選手オブジェクトを返す(元データは変更しない)
+function withUpgradedAbility(p, ability) {
+  const a = { ...(p.abilities || {}) };
+  if (ability === '弾道') {
+    a.弾道 = Math.min(4, (a.弾道 || 1) + 1);
+  } else {
+    const cur = a[ability] || 'G';
+    const idx = RANKS.indexOf(cur);
+    if (idx < RANKS.length - 1) a[ability] = RANKS[idx + 1];
+  }
+  return { ...p, abilities: a };
+}
+
+// 指定能力を1段階上げた場合の totalFieldScoreIdeal 向上幅を返す
+function enhancementImpact(p, ability, pos) {
+  if (pos === '投手') return 0;
+  return totalFieldScoreIdeal(withUpgradedAbility(p, ability), pos) - totalFieldScoreIdeal(p, pos);
+}
+
+// ポジションに効く能力トップn件を { ability, impact } の配列で返す(impact降順)
+function getTopImpacts(p, pos, n = 3) {
+  if (pos === '投手') return [];
+  const abilities = [...new Set([
+    ...Object.keys(config.positionWeights[pos] || {}),
+    ...Object.keys(config.manualBaseWeights?.野手 || {}),
+    '弾道'
+  ])];
+  return abilities
+    .map(ability => ({ ability, impact: enhancementImpact(p, ability, pos) }))
+    .filter(x => x.impact > 0)
+    .sort((a, b) => b.impact - a.impact)
+    .slice(0, n);
+}
+
+// 強化推奨リストのHTML(impactListHtmlの引数はgetTopImpactsの返り値)
+function impactListHtml(p, impacts) {
+  if (!impacts.length)
+    return '<div style="font-size:12px;color:var(--muted)">強化推奨なし(全能力が最大)</div>';
+  return impacts.map((x, idx) => {
+    const curRank = x.ability === '弾道' ? (p.abilities?.弾道 || 1) : (p.abilities?.[x.ability] || 'G');
+    const nextRank = x.ability === '弾道'
+      ? Math.min(4, Number(curRank) + 1)
+      : RANKS[Math.min(RANKS.indexOf(String(curRank)) + 1, RANKS.length - 1)];
+    const pts = score100(x.impact);
+    return `<div style="font-size:12px;display:flex;gap:6px;align-items:center">` +
+      `<span style="color:var(--muted);min-width:14px">${idx + 1}.</span>` +
+      `<span style="font-weight:600">${x.ability}</span>` +
+      `<span style="color:var(--muted)">${curRank}→${nextRank}</span>` +
+      `<span style="color:var(--ok);font-weight:700">+${pts}点</span>` +
+      `</div>`;
+  }).join('');
+}
 
 // 指定年数だけ学年を進めた仮の名簿を返す(ダッシュボードの「来年/再来年」表示用)
 // 卒業(grade > 3)した選手は除外する。実際のデータは変更しない。
@@ -1429,6 +1483,161 @@ function clearIdealFixed() {
   renderLineup();
 }
 
+
+/* ---------- 育成強化推奨 ---------- */
+
+function renderTraining() {
+  const el = document.getElementById('trainingResult');
+  if (!el) return;
+
+  const rs = roster(0);
+  const fielders = rs.filter(p => p.main !== '投手');
+
+  if (fielders.length < 9) {
+    el.innerHTML = '<div class="card" style="color:var(--muted)">野手が9人未満のため、育成推奨を計算できません。</div>';
+    return;
+  }
+
+  const FIELD_POS = ['捕手', '一塁', '二塁', '三塁', '遊撃', '外野', '外野', '外野'];
+  const LABELS    = ['捕手', '一塁', '二塁', '三塁', '遊撃', '左翼', '中堅', '右翼'];
+
+  // 理想スタメン(固定なし)
+  const idealPlan = solveLineup(rs, (p, pos) => totalFieldScoreIdeal(p, pos));
+  const allUsedIds = new Set([...idealPlan.assigned.values()].filter(Boolean).map(p => p.id));
+  const benchPlayers = fielders.filter(p => !allUsedIds.has(p.id));
+
+  const activeTab = el.dataset.activeTab || 'team';
+
+  // --- チーム視点: ポジション別に担当選手の強化推奨を表示 ---
+  function teamViewHtml() {
+    // 外野はチーム全体の最弱者スコアでマーク判定(3枠まとめて同一評価)
+    const ofScores = [5, 6, 7].map(fi => idealPlan.assigned.get(fi)).filter(Boolean)
+      .map(fp => totalFieldScoreIdeal(fp, '外野')).sort((a, b) => a - b);
+    const ofTh = config.positionThresholds['外野'] || { excellent: 24, good: 18, warning: 12 };
+    const ofTopCount = config.topCounts['外野'] || 2;
+    const ofPerTh = { excellent: ofTh.excellent / ofTopCount, good: ofTh.good / ofTopCount, warning: ofTh.warning / ofTopCount };
+    const [ofMark, ofCls] = evalMark(ofScores[0] || 0, ofPerTh);
+
+    const rows = FIELD_POS.map((pos, i) => {
+      const p = idealPlan.assigned.get(i);
+      if (!p) return '';
+      const needConvert = p.main !== pos && !(p.subsHigh || []).includes(pos);
+      const sIdeal   = score100(totalFieldScoreIdeal(p, pos));
+      const sCurrent = score100(totalFieldScore(p, pos));
+      const impacts  = getTopImpacts(p, pos);
+
+      let mark, cls;
+      if (pos === '外野') {
+        [mark, cls] = [ofMark, ofCls];
+      } else {
+        const topCount = config.topCounts[pos] || 2;
+        const th = config.positionThresholds[pos] || { excellent: 13, good: 10, warning: 7 };
+        const perTh = { excellent: th.excellent / topCount, good: th.good / topCount, warning: th.warning / topCount };
+        [mark, cls] = evalMark(totalFieldScoreIdeal(p, pos), perTh);
+      }
+
+      const convertBadge = needConvert
+        ? `<span style="font-size:10px;color:var(--danger);margin-left:4px;border:1px solid var(--danger);border-radius:4px;padding:1px 4px">コンバート</span>`
+        : '';
+      const scoreStr = needConvert
+        ? `<span style="font-size:11px;color:var(--muted)">${sCurrent}→</span><strong>${sIdeal}</strong>`
+        : `<strong>${sIdeal}</strong>`;
+      const borderColor = cls === 'bad' ? 'var(--bad)' : cls === 'mid' ? 'var(--warn)' : 'var(--border)';
+
+      return `<div style="border:1px solid ${borderColor};border-radius:8px;padding:10px 12px;margin-bottom:8px">` +
+        `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">` +
+        `<span style="font-weight:700;min-width:36px">${LABELS[i]}</span>` +
+        `<span style="font-size:13px">${p.name} ${p.grade}年</span>` +
+        convertBadge +
+        `<span class="eval ${cls}" style="font-size:15px">${mark}</span>` +
+        `<span style="font-size:12px;color:var(--muted)">${scoreStr}点</span>` +
+        `</div>` +
+        `<div style="display:flex;flex-direction:column;gap:3px;padding-left:4px">${impactListHtml(p, impacts)}</div>` +
+        `</div>`;
+    }).join('');
+
+    const benchHtml = benchPlayers.length === 0 ? '' :
+      `<h3 style="margin-top:16px">控え選手</h3>` +
+      benchPlayers.filter(p => p.main !== '投手').map(p => {
+        const impacts = getTopImpacts(p, p.main);
+        return `<div style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:6px">` +
+          `<div style="font-size:13px;margin-bottom:4px">` +
+          `<strong>${p.name} ${p.grade}年</strong>` +
+          `<span style="color:var(--muted);font-size:12px;margin-left:4px">[${POS_SHORT[p.main]}]</span>` +
+          `</div>` +
+          `<div style="display:flex;flex-direction:column;gap:3px;padding-left:4px">${impactListHtml(p, impacts)}</div>` +
+          `</div>`;
+      }).join('');
+
+    return `<div>${rows}${benchHtml}</div>`;
+  }
+
+  // --- 選手視点: 選手ごとに理想ポジション基準の強化推奨を表示 ---
+  function playerViewHtml() {
+    const playerPosMap = new Map(); // playerId -> { p, pos, posLabel, needConvert }
+    FIELD_POS.forEach((pos, i) => {
+      const p = idealPlan.assigned.get(i);
+      if (p && !playerPosMap.has(p.id)) {
+        playerPosMap.set(p.id, {
+          p, pos, posLabel: LABELS[i],
+          needConvert: p.main !== pos && !(p.subsHigh || []).includes(pos)
+        });
+      }
+    });
+
+    const starterCards = [...playerPosMap.values()].map(({ p, pos, posLabel, needConvert }) => {
+      const impacts  = getTopImpacts(p, pos);
+      const sIdeal   = score100(totalFieldScoreIdeal(p, pos));
+      const sCurrent = score100(totalFieldScore(p, pos));
+      const posInfo  = needConvert
+        ? `<span style="font-size:12px;color:var(--muted)">[${POS_SHORT[p.main]}]</span>` +
+          `<span style="color:var(--danger);font-size:12px"> → ${posLabel}(コンバート)</span>`
+        : `<span style="font-size:12px;color:var(--muted)">[${posLabel}]</span>`;
+      const scoreStr = needConvert
+        ? `<span style="font-size:11px;color:var(--muted)">${sCurrent}→</span>${sIdeal}点`
+        : `${sIdeal}点`;
+
+      return `<div style="border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-bottom:8px">` +
+        `<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">` +
+        `<span style="font-weight:700">${p.name} ${p.grade}年</span>` +
+        posInfo +
+        `<span style="font-size:12px;color:var(--muted)">${scoreStr}</span>` +
+        `</div>` +
+        `<div style="display:flex;flex-direction:column;gap:3px;padding-left:4px">${impactListHtml(p, impacts)}</div>` +
+        `</div>`;
+    }).join('');
+
+    const benchCards = benchPlayers.length === 0 ? '' :
+      `<h3 style="margin-top:16px">控え選手</h3>` +
+      benchPlayers.filter(p => p.main !== '投手').map(p => {
+        const impacts = getTopImpacts(p, p.main);
+        return `<div style="border:1px solid var(--border);border-radius:8px;padding:8px 12px;margin-bottom:6px">` +
+          `<div style="font-size:13px;margin-bottom:4px">` +
+          `<strong>${p.name} ${p.grade}年</strong>` +
+          `<span style="color:var(--muted);font-size:12px;margin-left:4px">[${POS_SHORT[p.main]}]</span>` +
+          `</div>` +
+          `<div style="display:flex;flex-direction:column;gap:3px;padding-left:4px">${impactListHtml(p, impacts)}</div>` +
+          `</div>`;
+      }).join('');
+
+    return `<div>${starterCards}${benchCards}</div>`;
+  }
+
+  const tabBar =
+    `<div style="display:flex;gap:4px;margin-bottom:12px">` +
+    `<button onclick="switchTrainingTab('team')" style="${activeTab === 'team' ? 'background:var(--primary);color:#fff;border-color:var(--primary)' : ''}">チーム視点</button>` +
+    `<button onclick="switchTrainingTab('player')" style="${activeTab === 'player' ? 'background:var(--primary);color:#fff;border-color:var(--primary)' : ''}">選手視点</button>` +
+    `</div>`;
+
+  el.innerHTML = tabBar + `<div class="analysis-card">${activeTab === 'team' ? teamViewHtml() : playerViewHtml()}</div>`;
+  el.dataset.activeTab = activeTab;
+}
+
+function switchTrainingTab(tabId) {
+  const el = document.getElementById('trainingResult');
+  if (el) el.dataset.activeTab = tabId;
+  renderTraining();
+}
 
 
 /* ---------- 年度進行・入出力 ---------- */
