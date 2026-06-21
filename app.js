@@ -1184,6 +1184,25 @@ function renderLineup() {
 
   // --- 理想案の描画 ---
   function idealPlanHtml() {
+    // 案A: チーム総合スコア(現実案 vs 理想案)をヘッダーに表示
+    const realTotal  = FIELD_POS.reduce((sum, fpos, fi) => {
+      const fp = realPlan.assigned.get(fi);
+      return sum + (fp ? score100(totalFieldScore(fp, fpos)) : 0);
+    }, 0);
+    const idealTotal = FIELD_POS.reduce((sum, fpos, fi) => {
+      const fp = idealPlan.assigned.get(fi);
+      return sum + (fp ? score100(totalFieldScoreIdeal(fp, fpos)) : 0);
+    }, 0);
+    const totalDiff = idealTotal - realTotal;
+    const teamScoreLine = `
+      <div style="font-size:13px;padding:6px 10px;margin-bottom:10px;border-radius:6px;border:1px solid var(--border);display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+        <span style="color:var(--muted)">チーム総合スコア</span>
+        <span>現実 <strong>${realTotal}</strong></span>
+        <span style="color:var(--muted)">→</span>
+        <span>理想 <strong style="color:var(--primary)">${idealTotal}</strong></span>
+        <span style="color:${totalDiff >= 0 ? 'var(--ok)' : 'var(--danger)'}; font-weight:700">(${totalDiff >= 0 ? '+' : ''}${totalDiff})</span>
+      </div>`;
+
     const rows = FIELD_POS.map((pos, i) => {
       const p = idealPlan.assigned.get(i);
       const curId = p ? p.id : '';
@@ -1226,6 +1245,12 @@ function renderLineup() {
         ? `<span style="font-size:10px;color:var(--muted)">${sCurrent}→</span>${sIdeal}`
         : `${sIdeal}`;
 
+      // 案B: 現実案で同ポジションに配置されていた選手が異なる場合に表示する
+      const realP = realPlan.assigned.get(i);
+      const realDiff = realP && realP.id !== curId
+        ? `<span style="font-size:11px;color:var(--muted)">現実: ${realP.name} ${score100(totalFieldScore(realP, pos))}</span>`
+        : '';
+
       // ◎○△×: コンバート後の理想スコアで評価する
       let mark, cls;
       const topCount = config.topCounts[pos] || 2;
@@ -1245,6 +1270,7 @@ function renderLineup() {
           <div>
             <select style="width:100%;padding:5px 8px;font-size:12px" onchange="onIdealChange(${i},this.value)">${options}</select>
             <span style="${nameColor}">${convertTag}</span>
+            ${realDiff}
           </div>
           ${fixBtn}
           <span class="eval ${cls}" style="font-size:16px">${mark}</span>
@@ -1314,7 +1340,7 @@ function renderLineup() {
       <h3>このスタメンを実現するために必要な変更</h3>
       <div class="muted" style="font-size:13px">コンバート不要です。</div>`;
 
-    return `<div style="margin-top:10px">${rows}${dhRow}</div><div style="margin-top:12px">${benchRows}${convertSection}</div>`;
+    return `<div style="margin-top:10px">${teamScoreLine}${rows}${dhRow}</div><div style="margin-top:12px">${benchRows}${convertSection}</div>`;
   }
 
   // --- タブバー ---
