@@ -130,12 +130,12 @@ function defaultConfig() {
       外野: { excellent: 24, good: 18, warning: 12 }
     },
     positionWeights: {
-      捕手: { キャッチャー: .4, 肩力: .25, 捕球: .2, 送球: .15 },
+      捕手: { キャッチャー: .5, 肩力: .25, 捕球: .15, 送球: .10 },
       一塁: { 捕球: .65, 守備力: .25, 送球: .10 },
-      二塁: { 守備力: .4, 送球: .35, 捕球: .15, 走力: .1 },
+      二塁: { 守備力: .4, 送球: .30, 捕球: .15, 走力: .15 },
       三塁: { 肩力: .3, 送球: .3, 捕球: .25, 守備力: .15 },
-      遊撃: { 守備力: .35, 送球: .3, 肩力: .2, 捕球: .15 },
-      外野: { 肩力: .35, 捕球: .3, 走力: .2, 送球: .15 }
+      遊撃: { 守備力: .4, 送球: .3, 肩力: .15, 捕球: .15 },
+      外野: { 肩力: .35, 走力: .3, 捕球: .20, 送球: .15 }
     },
     overallWeights: { ミート: .18, パワー: .18, 走力: .14, 肩力: .1, 守備力: .1, 捕球: .1, 送球: .07, チャンス: .05, 盗塁: .04, 走塁: .04 },
     pitcherWeights: {
@@ -148,12 +148,12 @@ function defaultConfig() {
     pitchTypeScale: { min: 0, max: 7 },
     totalBreakScale: { min: 0, max: 20 },
     positionRoles: {
-      捕手: { defense: 0.70, batting: 0.30 },
-      一塁: { defense: 0.40, batting: 0.60 },
+      捕手: { defense: 0.75, batting: 0.25 },
+      一塁: { defense: 0.35, batting: 0.65 },
       二塁: { defense: 0.65, batting: 0.35 },
       三塁: { defense: 0.45, batting: 0.55 },
-      遊撃: { defense: 0.70, batting: 0.30 },
-      外野: { defense: 0.35, batting: 0.65 }
+      遊撃: { defense: 0.75, batting: 0.25 },
+      外野: { defense: 0.40, batting: 0.60 }
     },
     manualBaseWeights: {
       野手: { ミート: 0.35, パワー: 0.30, 走力: 0.20, 弾道: 0.15 },
