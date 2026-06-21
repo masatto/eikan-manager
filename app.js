@@ -1245,11 +1245,23 @@ function renderLineup() {
         ? `<span style="font-size:10px;color:var(--muted)">${sCurrent}→</span>${sIdeal}`
         : `${sIdeal}`;
 
-      // 案B: 現実案で同ポジションに配置されていた選手が異なる場合に表示する
-      const realP = realPlan.assigned.get(i);
-      const realDiff = realP && realP.id !== curId
-        ? `<span style="font-size:11px;color:var(--muted)">現実: ${realP.name} ${score100(totalFieldScore(realP, pos))}</span>`
-        : '';
+      // 案B: 現実案との差分表示
+      // 外野は左翼/中堅/右翼の割り当て順序に意味がないため、インデックス一致ではなく
+      // 「理想案の選手が現実案の外野3枠のいずれかに存在するか」で判定する。
+      // 枠内の移動(例: 左翼→右翼)は差分なし扱いとし、外野の顔ぶれが変わる場合のみ表示する。
+      let realDiff = '';
+      if (pos === '外野') {
+        const realOutfielders = [5, 6, 7].map(fi => realPlan.assigned.get(fi)).filter(Boolean);
+        const isInRealOutfield = realOutfielders.some(fp => fp.id === curId);
+        if (!isInRealOutfield) {
+          const realP = realPlan.assigned.get(i);
+          if (realP) realDiff = `<span style="font-size:11px;color:var(--muted)">現実外野: ${realP.name} ${score100(totalFieldScore(realP, pos))}</span>`;
+        }
+      } else {
+        const realP = realPlan.assigned.get(i);
+        if (realP && realP.id !== curId)
+          realDiff = `<span style="font-size:11px;color:var(--muted)">現実: ${realP.name} ${score100(totalFieldScore(realP, pos))}</span>`;
+      }
 
       // ◎○△×: コンバート後の理想スコアで評価する
       let mark, cls;
