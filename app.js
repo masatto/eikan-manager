@@ -1213,27 +1213,30 @@ function renderLineup() {
           <span class="lineup-score">-</span>
         </div>`;
 
-      const s = score100(totalFieldScore(p, pos));
-      const bonus = posBonus(p, pos);
+      const sIdeal   = score100(totalFieldScoreIdeal(p, pos));
+      const sCurrent = score100(totalFieldScore(p, pos));
       const needConvert = p.main !== pos && !(p.subsHigh || []).includes(pos);
       const needUpgrade = p.main !== pos && (p.subs || []).includes(pos) && !(p.subsHigh || []).includes(pos);
-      const bonusTag = bonus < 1 ? `<span class="lineup-bonus">×${bonus}→×1.0</span>` : '';
       const convertTag = needConvert
         ? `<span style="font-size:10px;color:${needUpgrade ? 'var(--warn)' : 'var(--danger)'};margin-left:4px">${needUpgrade ? '◎格上げ' : 'コンバート'}</span>`
         : '';
       const nameColor = needConvert ? 'color:var(--danger)' : '';
+      // コンバートが必要な場合は「現状→理想」を表示してギャップを可視化する
+      const scoreDisplay = needConvert
+        ? `<span style="font-size:10px;color:var(--muted)">${sCurrent}→</span>${sIdeal}`
+        : `${sIdeal}`;
 
-      // 配置後評価
+      // ◎○△×: コンバート後の理想スコアで評価する
       let mark, cls;
       const topCount = config.topCounts[pos] || 2;
       const th = config.positionThresholds[pos];
       const perPersonTh = { excellent: th.excellent / topCount, good: th.good / topCount, warning: th.warning / topCount };
       if (pos === '外野') {
         const outScores = FIELD_POS.map((fp, fi) => fp === '外野' ? idealPlan.assigned.get(fi) : null)
-          .filter(Boolean).map(fp => totalFieldScore(fp, '外野')).sort((a, b) => a - b);
+          .filter(Boolean).map(fp => totalFieldScoreIdeal(fp, '外野')).sort((a, b) => a - b);
         [mark, cls] = evalMark(outScores[0] || 0, perPersonTh);
       } else {
-        [mark, cls] = evalMark(totalFieldScore(p, pos), perPersonTh);
+        [mark, cls] = evalMark(totalFieldScoreIdeal(p, pos), perPersonTh);
       }
 
       return `
@@ -1241,11 +1244,11 @@ function renderLineup() {
           <span class="lineup-pos">${LABELS[i]}</span>
           <div>
             <select style="width:100%;padding:5px 8px;font-size:12px" onchange="onIdealChange(${i},this.value)">${options}</select>
-            <span style="${nameColor}">${bonusTag}${convertTag}</span>
+            <span style="${nameColor}">${convertTag}</span>
           </div>
           ${fixBtn}
           <span class="eval ${cls}" style="font-size:16px">${mark}</span>
-          <span class="lineup-score">${s}</span>
+          <span class="lineup-score">${scoreDisplay}</span>
         </div>`;
     }).join('');
 
