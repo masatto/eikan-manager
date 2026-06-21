@@ -559,6 +559,17 @@ function totalFieldScore(p, pos) {
   return posPower(p, pos) * roles.defense + battingScore(p) * roles.batting;
 }
 
+// 理想案最適化用スコア。posBonus(現状のメイン/サブ/未経験補正)を除いた生の適性で評価する。
+// 「コンバートした場合の可能性」でポジションを割り当てることで、
+// ①控え選手がコンバートで主力になれるケース
+// ②スタメン内のポジション変更で全体底上げできるケース
+// を理想案として浮上させる。表示スコアはtotalFieldScore(posBonus込み)を使う。
+function totalFieldScoreIdeal(p, pos) {
+  if (pos === '投手') return pitcherScore(p, 'overall');
+  const roles = config.positionRoles?.[pos] || { defense: 0.55, batting: 0.45 };
+  return posFit(p, pos) * roles.defense + battingScore(p) * roles.batting;
+}
+
 // 1〜8スケールのスコアを0〜100点満点の表示用スコアに変換
 function score100(v) { return Math.round(v / 8 * 100); }
 
@@ -1134,7 +1145,7 @@ function renderLineup() {
         }
         return 0;
       }
-      return totalFieldScore(p, pos);
+      return totalFieldScoreIdeal(p, pos);
     });
   }
   const idealPlan = calcIdealPlan();
@@ -1208,7 +1219,7 @@ function renderLineup() {
       const needUpgrade = p.main !== pos && (p.subs || []).includes(pos) && !(p.subsHigh || []).includes(pos);
       const bonusTag = bonus < 1 ? `<span class="lineup-bonus">×${bonus}→×1.0</span>` : '';
       const convertTag = needConvert
-        ? `<span style="font-size:10px;color:var(--danger);margin-left:4px">${needUpgrade ? '◎格上げ' : 'コンバート'}</span>`
+        ? `<span style="font-size:10px;color:${needUpgrade ? 'var(--warn)' : 'var(--danger)'};margin-left:4px">${needUpgrade ? '◎格上げ' : 'コンバート'}</span>`
         : '';
       const nameColor = needConvert ? 'color:var(--danger)' : '';
 
