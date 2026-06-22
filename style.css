@@ -42,6 +42,7 @@ body {
 
 header {
   padding: 14px 20px;
+  padding-top: max(14px, env(safe-area-inset-top));
   background: #0a1118;
   color: #fff;
   display: flex;
