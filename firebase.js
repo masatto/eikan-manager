@@ -144,8 +144,8 @@ async function fbMergeAndSync() {
 
     merged.push(winner);
 
-    // ローカルの方が新しければFirestoreを更新
-    if (localAt > cloudAt) {
+    // Firestoreに存在しない、またはローカルの方が新しければFirestoreを更新
+    if (!cloud || localAt > cloudAt) {
       pushToCloud.push({ ...winner, _deleted: false });
     }
   }
