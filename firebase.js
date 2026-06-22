@@ -9,12 +9,12 @@
 //       プロジェクトの設定値をコピーしてここに貼り付けてください。
 //       projectId を入力するとGoogle認証とデータ同期が有効になります。
 const FIREBASE_CONFIG = {
-  apiKey: "",
-  authDomain: "",
-  projectId: "",
-  storageBucket: "",
-  messagingSenderId: "",
-  appId: ""
+  apiKey: "AIzaSyAic9IefT6f40Fx-3_3AFptAlsZmQ1PV0c",
+  authDomain: "eikan-manager.firebaseapp.com",
+  projectId: "eikan-manager",
+  storageBucket: "eikan-manager.firebasestorage.app",
+  messagingSenderId: "308121789051",
+  appId: "1:308121789051:web:58cbd4b724aee8ad4ef8de"
 };
 
 const FB_ENABLED = !!FIREBASE_CONFIG.projectId;
