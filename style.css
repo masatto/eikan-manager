@@ -494,7 +494,27 @@ select option {
 /* ---------- スマートフォン向け ---------- */
 
 @media (max-width: 640px) {
-  header { padding: 12px 14px; }
+  header {
+    padding: 8px 12px;
+  }
+  h1 {
+    font-size: 15px;
+    white-space: nowrap;
+  }
+  h1 span {
+    display: inline;
+  }
+  #saveStatus {
+    font-size: 10px;
+  }
+  .sync-btn {
+    font-size: 11px;
+    padding: 3px 6px;
+  }
+  .sync-user {
+    font-size: 10px;
+    max-width: 60px;
+  }
   main { padding: 12px; }
 
   .ability-row {
@@ -513,9 +533,10 @@ select option {
     font-size: 13px;
   }
   nav button {
-    padding: 10px 8px 8px;
-    font-size: 11px;
-    min-width: 44px;
+    padding: 12px 4px 10px;
+    font-size: 10px;
+    min-width: 0;
+    min-height: 52px;
   }
 }
 
