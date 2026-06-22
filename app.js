@@ -1581,8 +1581,7 @@ function renderTraining() {
   const FIELD_POS = ['捕手', '一塁', '二塁', '三塁', '遊撃', '外野', '外野', '外野'];
   const LABELS    = ['捕手', '一塁', '二塁', '三塁', '遊撃', '左翼', '中堅', '右翼'];
 
-  // 理想スタメン(固定なし)
-  const idealPlan = solveLineup(rs, (p, pos) => totalFieldScoreIdeal(p, pos));
+  const idealPlan = calcIdealPlan(rs);
   const allUsedIds = new Set([...idealPlan.assigned.values()].filter(Boolean).map(p => p.id));
   const benchPlayers = fielders.filter(p => !allUsedIds.has(p.id));
 
