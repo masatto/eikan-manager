@@ -217,17 +217,32 @@ function buildForm() {
 }
 
 
-// 特殊能力チェックリストを構築する。カテゴリ別にグループ化して表示。
-// 赤特(マイナス能力)は赤色、金特は黄色、青特は青色で表示して区別する。
-function buildSpecialAbilityFields() {
+function buildSpecialAbilityFields(preserveFilter) {
   const el = document.getElementById('specialAbilityFields');
   if (!el || !config.specialAbilities) return;
   if (!formState.specialAbilities) formState.specialAbilities = [];
+  if (!preserveFilter) formState._specialAbilityFilter = '';
 
+  const q = (formState._specialAbilityFilter || '').trim();
   const isPitcher = formState.main === '投手';
   const abilities = config.specialAbilities.filter(a =>
     a.target === '共通' || (isPitcher ? a.target === '投手' : a.target === '野手')
   );
+
+  const chipStyle = (checked, color) =>
+    'display:inline-flex;align-items:center;cursor:pointer;font-size:14px;' +
+    'padding:7px 12px;border-radius:8px;border:1px solid ' + (checked ? color : 'var(--border)') + ';' +
+    'background:' + (checked ? color + '22' : 'var(--surface)') + ';color:' + (checked ? color : 'var(--text)') + ';' +
+    'user-select:none;-webkit-user-select:none;';
+
+  const renderChip = a => {
+    const checked = formState.specialAbilities.includes(a.name);
+    const color = a.type === '赤特' ? 'var(--danger)' : a.type === '金特' ? 'var(--warn)' : 'var(--primary)';
+    return '<label style="' + chipStyle(checked, color) + '">' +
+      '<input type="checkbox" style="display:none" ' + (checked ? 'checked' : '') +
+      ' onchange="toggleSpecialAbility(\'' + a.name + '\', this.checked)">' +
+      a.name + '</label>';
+  };
 
   const groups = {};
   abilities.forEach(a => {
@@ -235,28 +250,34 @@ function buildSpecialAbilityFields() {
     groups[a.category].push(a);
   });
 
-  el.innerHTML = Object.entries(groups).map(([cat, items]) => `
-    <div style="margin-bottom:10px">
+  const groupsHtml = Object.entries(groups).map(([cat, items]) => {
+    const visible = items.filter(a =>
+      formState.specialAbilities.includes(a.name) || !q || a.name.includes(q)
+    );
+    if (!visible.length) return '';
+    return `<div style="margin-bottom:10px">
       <div style="font-size:12px;color:var(--muted);font-weight:700;margin-bottom:6px">${cat}</div>
-      <div style="display:flex;flex-wrap:wrap;gap:6px">
-        ${items.map(a => {
-          const checked = formState.specialAbilities.includes(a.name);
-          const isMinus = a.type === '赤特';
-          const isGold  = a.type === '金特';
-          const color = isMinus ? 'var(--danger)' : isGold ? 'var(--warn)' : 'var(--primary)';
-          return '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:13px;' +
-            'padding:4px 8px;border-radius:6px;border:1px solid ' + (checked ? color : 'var(--border)') + ';' +
-            'background:' + (checked ? color + '22' : 'var(--surface)') + ';color:' + (checked ? color : 'var(--muted)') + '">' +
-            '<input type="checkbox" style="display:none" ' + (checked ? 'checked' : '') +
-            ' onchange="toggleSpecialAbility(\'' + a.name + '\', this.checked)">' +
-            a.name + '</label>';
-        }).join('')}
-      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px">${visible.map(renderChip).join('')}</div>
+    </div>`;
+  }).join('');
+
+  el.innerHTML = `
+    <div style="margin-bottom:10px">
+      <input type="text" placeholder="特殊能力を検索…" value="${q.replace(/"/g, '&quot;')}"
+        oninput="filterSpecialAbilities(this.value)"
+        style="width:100%;box-sizing:border-box;padding:8px 10px;font-size:14px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)">
     </div>
-  `).join('');
+    ${groupsHtml}
+  `;
 }
 
-// 特殊能力のチェック状態をformStateに反映してUIを更新する
+function filterSpecialAbilities(q) {
+  formState._specialAbilityFilter = q;
+  buildSpecialAbilityFields(true);
+  const input = document.querySelector('#specialAbilityFields input[type="text"]');
+  if (input) { input.focus(); input.setSelectionRange(q.length, q.length); }
+}
+
 function toggleSpecialAbility(name, checked) {
   if (!formState.specialAbilities) formState.specialAbilities = [];
   if (checked) {
@@ -264,7 +285,7 @@ function toggleSpecialAbility(name, checked) {
   } else {
     formState.specialAbilities = formState.specialAbilities.filter(n => n !== name);
   }
-  buildSpecialAbilityFields();
+  buildSpecialAbilityFields(true);
 }
 
 // メインポジションが投手以外の場合、投手能力セクションを非表示にする。
@@ -1104,6 +1125,28 @@ function solveLineup(rs, scoreFn) {
 let idealFixed = new Map(); // playerId -> posIndex (or 'dh' -> 'dh')
 let idealTemp  = new Map(); // playerId -> posIndex (or 'dh' -> 'dh')
 
+function calcIdealPlan(rs) {
+  const FIELD_POS = ['捕手', '一塁', '二塁', '三塁', '遊撃', '外野', '外野', '外野'];
+  const merged = new Map([...idealTemp, ...idealFixed]);
+  const preAssigned = new Map(); // posIndex -> playerId
+  for (const [playerId, posIndex] of merged) {
+    if (posIndex !== 'dh') preAssigned.set(posIndex, playerId);
+  }
+  const preUsedIds = new Set(preAssigned.values());
+  const dhFixedId = idealFixed.get('dh') || idealTemp.get('dh') || null;
+  if (dhFixedId) preUsedIds.add(dhFixedId);
+
+  return solveLineup(rs, (p, pos) => {
+    if (preUsedIds.has(p.id)) {
+      for (const [i, id] of preAssigned.entries()) {
+        if (id === p.id && FIELD_POS[i] === pos) return 999;
+      }
+      return 0;
+    }
+    return totalFieldScoreIdeal(p, pos);
+  });
+}
+
 // スタメン考案タブの描画。現実案・理想案(固定機能付き)の2タブ構成。
 function renderLineup() {
   const el = document.getElementById('lineupResult');
@@ -1124,31 +1167,7 @@ function renderLineup() {
   // 現実案: 全選手対象
   const realPlan = solveLineup(rs, (p, pos) => totalFieldScore(p, pos));
 
-  // 理想案の計算:
-  // 1. 固定(idealFixed)と仮配置(idealTemp)の選手を事前に割り当て
-  // 2. 残りのポジション・選手で最適化
-  function calcIdealPlan() {
-    // idealFixed優先でマージ(固定 > 仮配置)
-    const merged = new Map([...idealTemp, ...idealFixed]); // idealFixedで上書き
-    const preAssigned = new Map(); // posIndex -> playerId
-    for (const [playerId, posIndex] of merged) {
-      if (posIndex !== 'dh') preAssigned.set(posIndex, playerId);
-    }
-    const preUsedIds = new Set(preAssigned.values());
-    const dhFixedId = idealFixed.get('dh') || idealTemp.get('dh') || null;
-    if (dhFixedId) preUsedIds.add(dhFixedId);
-
-    return solveLineup(rs, (p, pos) => {
-      if (preUsedIds.has(p.id)) {
-        for (const [i, id] of preAssigned.entries()) {
-          if (id === p.id && FIELD_POS[i] === pos) return 999;
-        }
-        return 0;
-      }
-      return totalFieldScoreIdeal(p, pos);
-    });
-  }
-  const idealPlan = calcIdealPlan();
+  const idealPlan = calcIdealPlan(rs);
   window._lineupRs = rs;
 
   // --- 現実案の描画 ---

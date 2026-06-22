@@ -50,12 +50,12 @@
   },
 
   "positionWeights": {
-    "捕手": { "キャッチャー": 0.40, "肩力": 0.25, "捕球": 0.20, "送球": 0.15 },
-    "一塁": { "捕球": 0.55, "ミート": 0.15, "パワー": 0.15, "守備力": 0.15 },
-    "二塁": { "守備力": 0.40, "送球": 0.35, "捕球": 0.15, "走力": 0.10 },
+    "捕手": { "キャッチャー": 0.50, "肩力": 0.25, "捕球": 0.15, "送球": 0.10 },
+    "一塁": { "捕球": 0.65, "守備力": 0.25, "送球": 0.10 },
+    "二塁": { "守備力": 0.40, "送球": 0.30, "捕球": 0.15, "走力": 0.15 },
     "三塁": { "肩力": 0.30, "送球": 0.30, "捕球": 0.25, "守備力": 0.15 },
-    "遊撃": { "守備力": 0.35, "送球": 0.30, "肩力": 0.20, "捕球": 0.15 },
-    "外野": { "肩力": 0.35, "捕球": 0.30, "走力": 0.20, "送球": 0.15 }
+    "遊撃": { "守備力": 0.40, "送球": 0.30, "肩力": 0.15, "捕球": 0.15 },
+    "外野": { "肩力": 0.35, "走力": 0.30, "捕球": 0.20, "送球": 0.15 }
   },
 
   "overallWeights": {
@@ -104,12 +104,12 @@
   "pitcherThresholds": { "ace": 5.2, "relief": 4.8 },
 
   "positionRoles": {
-    "捕手": { "defense": 0.70, "batting": 0.30 },
-    "一塁": { "defense": 0.40, "batting": 0.60 },
+    "捕手": { "defense": 0.75, "batting": 0.25 },
+    "一塁": { "defense": 0.35, "batting": 0.65 },
     "二塁": { "defense": 0.65, "batting": 0.35 },
     "三塁": { "defense": 0.45, "batting": 0.55 },
-    "遊撃": { "defense": 0.70, "batting": 0.30 },
-    "外野": { "defense": 0.35, "batting": 0.65 }
+    "遊撃": { "defense": 0.75, "batting": 0.25 },
+    "外野": { "defense": 0.40, "batting": 0.60 }
   },
 
   "manualBaseWeights": {
@@ -157,7 +157,7 @@
     { "name": "悪球打ち",             "type": "青赤特", "target": "野手", "category": "打撃",    "weight": 0, "manualWeight": 0.3,  "autoWeight": 0    },
     { "name": "マルチ弾",             "type": "青特",   "target": "野手", "category": "打撃",    "weight": 0, "manualWeight": 0.3,  "autoWeight": 0.1  },
     { "name": "帳尻合わせ",           "type": "青特",   "target": "野手", "category": "打撃",    "weight": 0, "manualWeight": 0.2,  "autoWeight": 0.1  },
-    { "name": "引っ張り屋",           "type": "青特",   "target": "野手", "category": "打撃",    "weight": 0, "manualWeight": 0.3,  "autoWeight": 0.1  },
+    { "name": "引っ張り屋",           "type": "金特",   "target": "野手", "category": "打撃",    "weight": 0, "manualWeight": 0.6,  "autoWeight": 0.3  },
     { "name": "高速レーザー",         "type": "金特",   "target": "野手", "category": "守備",    "weight": 0, "manualWeight": 0,    "autoWeight": 0.6  },
     { "name": "高速ベースラン",       "type": "金特",   "target": "野手", "category": "走塁",    "weight": 0, "manualWeight": 0.3,  "autoWeight": 0.3  },
     { "name": "電光石火",             "type": "金特",   "target": "野手", "category": "走塁",    "weight": 0, "manualWeight": 0.3,  "autoWeight": 0.6  },
@@ -199,6 +199,8 @@
     { "name": "併殺",                 "type": "赤特",   "target": "野手", "category": "マイナス", "weight": 0, "manualWeight": -0.3, "autoWeight": -0.3 },
     { "name": "扇風機",               "type": "赤特",   "target": "野手", "category": "マイナス", "weight": 0, "manualWeight": -0.3, "autoWeight": -0.3 },
     { "name": "ムード×",             "type": "赤特",   "target": "野手", "category": "マイナス", "weight": 0, "manualWeight": 0,    "autoWeight": -0.3 },
+    { "name": "チャンス×",           "type": "赤特",   "target": "野手", "category": "マイナス", "weight": 0, "manualWeight": -0.3, "autoWeight": -0.3 },
+    { "name": "走塁×",               "type": "赤特",   "target": "野手", "category": "マイナス", "weight": 0, "manualWeight": -0.2, "autoWeight": -0.2 },
     { "name": "重い球",               "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.2,  "autoWeight": 0.2  },
     { "name": "逃げ球",               "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.2,  "autoWeight": 0.2  },
     { "name": "根性○",               "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0,    "autoWeight": 0.2  },
@@ -206,7 +208,7 @@
     { "name": "低め○",               "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.2,  "autoWeight": 0.2  },
     { "name": "立ち上がり○",         "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0,    "autoWeight": 0.2  },
     { "name": "球速安定",             "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.2,  "autoWeight": 0.2  },
-    { "name": "ギアチェンジ",         "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.3,  "autoWeight": 0.2  },
+    { "name": "ギアチェンジ",         "type": "金特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.6,  "autoWeight": 0.3  },
     { "name": "緩急○",               "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.2,  "autoWeight": 0.2  },
     { "name": "キレ○",               "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.3,  "autoWeight": 0.2  },
     { "name": "緊急登板○",           "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0,    "autoWeight": 0.2  },
@@ -257,6 +259,52 @@
     { "name": "寸前",                 "type": "赤特",   "target": "投手", "category": "マイナス", "weight": 0, "manualWeight": -0.3, "autoWeight": -0.3 },
     { "name": "負け運",               "type": "赤特",   "target": "投手", "category": "マイナス", "weight": 0, "manualWeight": 0,    "autoWeight": -0.3 },
     { "name": "対ランナー×",         "type": "赤特",   "target": "投手", "category": "マイナス", "weight": 0, "manualWeight": 0,    "autoWeight": -0.3 },
-    { "name": "ボール先行",           "type": "赤特",   "target": "投手", "category": "マイナス", "weight": 0, "manualWeight": -0.3, "autoWeight": -0.3 }
+    { "name": "ボール先行",           "type": "赤特",   "target": "投手", "category": "マイナス", "weight": 0, "manualWeight": -0.3, "autoWeight": -0.3 },
+    { "name": "抜け球",               "type": "赤特",   "target": "投手", "category": "マイナス", "weight": 0, "manualWeight": -0.3, "autoWeight": -0.3 },
+    { "name": "死球集中",             "type": "青赤特", "target": "投手", "category": "マイナス", "weight": 0, "manualWeight": -0.3, "autoWeight": -0.3 },
+
+    { "name": "意外性",               "type": "青特",   "target": "野手", "category": "打撃",    "weight": 0, "manualWeight": 0.2,  "autoWeight": 0.2  },
+    { "name": "いぶし銀",             "type": "青特",   "target": "野手", "category": "打撃",    "weight": 0, "manualWeight": 0.1,  "autoWeight": 0.2  },
+    { "name": "お祭り男",             "type": "青特",   "target": "野手", "category": "打撃",    "weight": 0, "manualWeight": 0.1,  "autoWeight": 0.1  },
+    { "name": "初球○",               "type": "青特",   "target": "野手", "category": "打撃",    "weight": 0, "manualWeight": 0.2,  "autoWeight": 0.2  },
+    { "name": "プレッシャーラン",     "type": "青特",   "target": "野手", "category": "走塁",    "weight": 0, "manualWeight": 0.1,  "autoWeight": 0.1  },
+    { "name": "かく乱",               "type": "青特",   "target": "野手", "category": "走塁",    "weight": 0, "manualWeight": 0.1,  "autoWeight": 0.2  },
+    { "name": "ヘッドスライディング", "type": "青特",   "target": "野手", "category": "走塁",    "weight": 0, "manualWeight": 0.1,  "autoWeight": 0.1  },
+    { "name": "シュート打ちの名人",   "type": "青特",   "target": "野手", "category": "打撃",    "weight": 0, "manualWeight": 0.2,  "autoWeight": 0.1  },
+    { "name": "必殺仕事人",           "type": "青特",   "target": "野手", "category": "勝負強さ", "weight": 0, "manualWeight": 0.2,  "autoWeight": 0.2  },
+    { "name": "ささやき破り",         "type": "青特",   "target": "野手", "category": "捕手対策", "weight": 0, "manualWeight": 0,    "autoWeight": 0.1  },
+    { "name": "存在感（野手）",       "type": "青特",   "target": "野手", "category": "チーム貢献","weight": 0, "manualWeight": 0.1,  "autoWeight": 0.2  },
+    { "name": "威圧感（野手）",       "type": "青特",   "target": "野手", "category": "チーム貢献","weight": 0, "manualWeight": 0.2,  "autoWeight": 0.3  },
+    { "name": "春男",                 "type": "青特",   "target": "野手", "category": "打撃",    "weight": 0, "manualWeight": 0.1,  "autoWeight": 0.1  },
+    { "name": "夏男",                 "type": "青特",   "target": "野手", "category": "打撃",    "weight": 0, "manualWeight": 0.1,  "autoWeight": 0.1  },
+    { "name": "秋男",                 "type": "青特",   "target": "野手", "category": "打撃",    "weight": 0, "manualWeight": 0.1,  "autoWeight": 0.1  },
+
+    { "name": "気迫ヘッド",           "type": "金特",   "target": "野手", "category": "走塁",    "weight": 0, "manualWeight": 0.2,  "autoWeight": 0.3  },
+    { "name": "ゴジラ",               "type": "金特",   "target": "野手", "category": "打撃",    "weight": 0, "manualWeight": 0.3,  "autoWeight": 0.3  },
+    { "name": "Big Fly",              "type": "金特",   "target": "野手", "category": "打撃",    "weight": 0, "manualWeight": 0.4,  "autoWeight": 0.3  },
+    { "name": "ID野球の申し子",       "type": "金特",   "target": "野手", "category": "捕手適性", "weight": 0, "manualWeight": 0,    "autoWeight": 0.6  },
+
+    { "name": "超投打躍動",           "type": "金特",   "target": "共通", "category": "投打",    "weight": 0, "manualWeight": 0.3,  "autoWeight": 0.6  },
+    { "name": "SHO-TIME",             "type": "金特",   "target": "共通", "category": "投打",    "weight": 0, "manualWeight": 0.3,  "autoWeight": 0.6  },
+
+    { "name": "闘志",                 "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0,    "autoWeight": 0.2  },
+    { "name": "勝ち運",               "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.1,  "autoWeight": 0.2  },
+    { "name": "ストライク先行",       "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.2,  "autoWeight": 0.3  },
+    { "name": "回またぎ○",           "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0,    "autoWeight": 0.2  },
+    { "name": "リリース○",           "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.3,  "autoWeight": 0.1  },
+    { "name": "打球反応○",           "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0,    "autoWeight": 0.1  },
+    { "name": "ナチュラルシュート",   "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.2,  "autoWeight": 0.1  },
+    { "name": "真っスラ",             "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.2,  "autoWeight": 0.1  },
+    { "name": "存在感（投手）",       "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0,    "autoWeight": 0.2  },
+    { "name": "威圧感（投手）",       "type": "青特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0,    "autoWeight": 0.3  },
+
+    { "name": "ポーカーフェイス",     "type": "青赤特", "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.1,  "autoWeight": 0.1  },
+    { "name": "力配分",               "type": "青赤特", "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.1,  "autoWeight": 0.1  },
+    { "name": "荒れ球",               "type": "青赤特", "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.1,  "autoWeight": 0.1  },
+    { "name": "ゴロピッチャー",       "type": "青赤特", "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.1,  "autoWeight": 0.2  },
+    { "name": "フライボールピッチャー","type": "青赤特", "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0,    "autoWeight": -0.1 },
+    { "name": "全開",                 "type": "青赤特", "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0.1,  "autoWeight": 0.2  },
+
+    { "name": "神の子",               "type": "金特",   "target": "投手", "category": "投手特殊", "weight": 0, "manualWeight": 0,    "autoWeight": 0.6  }
   ]
 }
