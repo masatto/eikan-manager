@@ -1777,6 +1777,7 @@ function importJson() {
       if (!Array.isArray(arr)) throw new Error();
       players = arr;
       save();
+      players.forEach(p => fbSavePlayer(p));
 
       // 守備重み設定が含まれていれば復元する(旧バージョンのJSONには含まれないためスキップ)
       if (d.weightSettings && typeof d.weightSettings === 'object') {
