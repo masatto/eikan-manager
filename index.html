@@ -15,7 +15,10 @@
 
   <header>
     <h1>栄冠ナイン<span>育成管理</span></h1>
-    <div id="saveStatus">未保存</div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      <div id="syncArea"></div>
+      <div id="saveStatus">未保存</div>
+    </div>
   </header>
 
   <!-- タブナビゲーション。data-screen属性で対応する<section>のidを指定する -->
@@ -181,6 +184,7 @@
 
   </main>
 
+  <script src="firebase.js"></script>
   <script src="app.js"></script>
 </body>
 </html>

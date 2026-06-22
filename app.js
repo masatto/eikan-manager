@@ -59,6 +59,7 @@ async function init() {
   buildForm();
   bind();
   renderAll();
+  fbInit(); // Firebase同期(FIREBASE_CONFIGのprojectId未設定時はnoop)
 }
 
 // localStorageのカスタム重みをconfig.positionWeightsに反映する。
@@ -447,10 +448,13 @@ function savePlayer(e) {
 
   if (!p.name) return alert('名前を入力してください');
 
+  p.updatedAt = Date.now();
+
   const i = players.findIndex(x => x.id === p.id);
   if (i >= 0) players[i] = p; else players.push(p);
 
   save();
+  fbSavePlayer(p);
   clearForm();
   renderAll();
   show('players');
@@ -493,6 +497,7 @@ function deletePlayer() {
   if (confirm('削除しますか？')) {
     players = players.filter(p => p.id !== id);
     save();
+    fbDeletePlayer(id);
     clearForm();
     renderAll();
     show('players');
