@@ -108,7 +108,7 @@ nav {
   border-top: 1px solid var(--border);
   overflow-x: auto;
   /* iPhone ホームバー対応 */
-  padding-bottom: env(safe-area-inset-bottom);
+  padding-bottom: max(env(safe-area-inset-bottom), 4px);
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
 }
@@ -207,7 +207,7 @@ main {
   margin: auto;
   padding: 16px;
   /* 下部固定タブバー(約60px) + iPhoneホームバーの分だけ余白を確保 */
-  padding-bottom: calc(60px + env(safe-area-inset-bottom) + 16px);
+  padding-bottom: calc(60px + max(env(safe-area-inset-bottom), 4px) + 16px);
 }
 
 .screen { display: none; }
