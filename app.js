@@ -242,6 +242,25 @@ function buildSpecialAbilityFields(preserveFilter) {
   if (!preserveFilter) formState._specialAbilityFilter = '';
 
   const q = (formState._specialAbilityFilter || '').trim();
+
+  if (!preserveFilter || !el.querySelector('input[type="text"]')) {
+    el.innerHTML = `
+      <div style="margin-bottom:10px">
+        <input type="text" placeholder="特殊能力を検索…" value="${q.replace(/"/g, '&quot;')}"
+          oninput="filterSpecialAbilities(this.value)"
+          style="width:100%;box-sizing:border-box;padding:8px 10px;font-size:14px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)">
+      </div>
+      <div id="specialAbilityChips"></div>
+    `;
+  }
+
+  _renderSpecialAbilityChips(q);
+}
+
+function _renderSpecialAbilityChips(q) {
+  const chipsEl = document.getElementById('specialAbilityChips');
+  if (!chipsEl || !config.specialAbilities) return;
+
   const isPitcher = formState.main === '投手';
   const abilities = config.specialAbilities.filter(a =>
     a.target === '共通' || (isPitcher ? a.target === '投手' : a.target === '野手')
@@ -268,7 +287,7 @@ function buildSpecialAbilityFields(preserveFilter) {
     groups[a.category].push(a);
   });
 
-  const groupsHtml = Object.entries(groups).map(([cat, items]) => {
+  chipsEl.innerHTML = Object.entries(groups).map(([cat, items]) => {
     const visible = items.filter(a =>
       formState.specialAbilities.includes(a.name) || !q || a.name.includes(q)
     );
@@ -278,22 +297,11 @@ function buildSpecialAbilityFields(preserveFilter) {
       <div style="display:flex;flex-wrap:wrap;gap:6px">${visible.map(renderChip).join('')}</div>
     </div>`;
   }).join('');
-
-  el.innerHTML = `
-    <div style="margin-bottom:10px">
-      <input type="text" placeholder="特殊能力を検索…" value="${q.replace(/"/g, '&quot;')}"
-        oninput="filterSpecialAbilities(this.value)"
-        style="width:100%;box-sizing:border-box;padding:8px 10px;font-size:14px;border:1px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text)">
-    </div>
-    ${groupsHtml}
-  `;
 }
 
 function filterSpecialAbilities(q) {
   formState._specialAbilityFilter = q;
-  buildSpecialAbilityFields(true);
-  const input = document.querySelector('#specialAbilityFields input[type="text"]');
-  if (input) { input.focus(); input.setSelectionRange(q.length, q.length); }
+  _renderSpecialAbilityChips(q.trim());
 }
 
 function toggleSpecialAbility(name, checked) {
