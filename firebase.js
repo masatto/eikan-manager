@@ -131,11 +131,13 @@ async function fbMergeAndSync() {
     const localAt = local?.updatedAt || 0;
     const cloudAt = cloud?.updatedAt || 0;
 
-    // updatedAtが新しい方を正とする
-    const winner = localAt >= cloudAt ? local : cloud;
+    // 片方にしか存在しない場合はそちらを使う。両方ある場合はupdatedAtが新しい方を正とする。
+    let winner;
+    if (!local)       winner = cloud;
+    else if (!cloud)  winner = local;
+    else              winner = localAt >= cloudAt ? local : cloud;
 
     if (!winner || winner._deleted) {
-      // 削除済み: ローカルに残っていれば相手側に削除を伝える
       if (local && !local._deleted) {
         pushToCloud.push({ id, _deleted: true, updatedAt: Math.max(localAt, cloudAt) });
       }
