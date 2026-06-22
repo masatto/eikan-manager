@@ -152,13 +152,6 @@ async function fbMergeAndSync() {
     }
   }
 
-  console.log('[Firebase] マージ結果:', {
-    local: Object.keys(localMap).length + '件',
-    cloud: Object.keys(cloudMap).length + '件',
-    merged: merged.length + '件',
-    pushToCloud: pushToCloud.length + '件'
-  });
-
   // ローカルに反映
   players = merged;
   save();
