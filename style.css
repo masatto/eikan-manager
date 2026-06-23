@@ -207,8 +207,8 @@ main {
   max-width: 1100px;
   margin: auto;
   padding: 16px;
-  /* 下部固定タブバー(~90px) + iPhoneホームバーの分だけ余白を確保 */
-  padding-bottom: calc(max(env(safe-area-inset-bottom), 8px) + 90px);
+  /* 下部固定タブバー + Safariブラウザバーの分だけ余白を確保 */
+  padding-bottom: calc(max(env(safe-area-inset-bottom), 8px) + 150px);
 }
 
 .screen { display: none; }
