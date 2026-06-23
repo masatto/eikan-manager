@@ -35,6 +35,10 @@ body {
   color: var(--text);
   font-family: -apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif;
   line-height: 1.5;
+  display: flex;
+  flex-direction: column;
+  height: 100dvh;
+  overflow: hidden;
 }
 
 
@@ -49,8 +53,7 @@ header {
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid var(--border);
-  position: sticky;
-  top: 0;
+  flex-shrink: 0;
   z-index: 10;
 }
 
@@ -96,22 +99,18 @@ h3 {
 }
 
 
-/* ---------- ナビゲーション(下部固定タブバー) ---------- */
+/* ---------- ナビゲーション(下部タブバー) ---------- */
 
 nav {
-  position: fixed;
-  bottom: 0;
-  left: 0;
-  right: 0;
-  z-index: 100;
   display: flex;
+  flex-shrink: 0;
   background: #0a1118;
   border-top: 1px solid var(--border);
   overflow-x: auto;
-  /* iPhone ホームバー対応 */
   padding-bottom: max(env(safe-area-inset-bottom), 4px);
   -webkit-overflow-scrolling: touch;
   scrollbar-width: none;
+  z-index: 100;
 }
 
 nav::-webkit-scrollbar {
@@ -204,11 +203,10 @@ button.danger:hover {
 /* ---------- レイアウト ---------- */
 
 main {
-  max-width: 1100px;
-  margin: auto;
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
   padding: 16px;
-  /* 下部固定タブバー + Safariブラウザバーの分だけ余白を確保 */
-  padding-bottom: calc(max(env(safe-area-inset-bottom), 8px) + 150px);
 }
 
 .screen { display: none; }
@@ -509,6 +507,7 @@ select option {
 @media (max-width: 640px) {
   header {
     padding: 8px 12px;
+    padding-top: max(8px, env(safe-area-inset-top));
   }
   h1 {
     font-size: 15px;
@@ -529,6 +528,12 @@ select option {
     max-width: 60px;
   }
   main { padding: 12px; }
+  .actions {
+    position: static;
+    border-top: none;
+    padding: 0;
+    margin: 18px 0;
+  }
 
   .ability-row {
     grid-template-columns: 1fr;
