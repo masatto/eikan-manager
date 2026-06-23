@@ -381,6 +381,18 @@ select option {
   font-weight: 700;
 }
 
+@media (max-width: 640px) {
+  .actions {
+    position: sticky;
+    bottom: calc(max(env(safe-area-inset-bottom), 8px) + 58px);
+    background: var(--bg);
+    padding: 10px 0;
+    margin: 0;
+    z-index: 50;
+    border-top: 1px solid var(--border);
+  }
+}
+
 
 /* ---------- 選手一覧 ---------- */
 
